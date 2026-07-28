@@ -1,0 +1,47 @@
+# Python 虚拟环境
+backend/.venv/
+ml/.venv/
+.venv/
+
+# Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# 前端依赖和构建结果
+frontend/node_modules/
+frontend/dist/
+
+# 环境变量和密码
+.env
+backend/.env
+frontend/.env
+*.env.local
+
+# 训练数据：不要上传患者数据
+ml/data/
+
+# 训练阶段输出，正式使用的是 backend/models 中的模型
+ml/output/
+
+# IDE 配置
+.idea/
+.vscode/
+
+# 日志及系统文件
+*.log
+.DS_Store
+Thumbs.db
+artifacts/
+
+# 人工维护的知识复验数据与运行状态
+data/review/current/chunks/*
+!data/review/current/chunks/.gitkeep
+data/review/current/entity_nodes/*
+!data/review/current/entity_nodes/.gitkeep
+data/review/current/raw_pdf/*
+!data/review/current/raw_pdf/.gitkeep
+data/review/current/graph_property_schema_v3_6.json
+data/review/state/*
+!data/review/state/.gitkeep

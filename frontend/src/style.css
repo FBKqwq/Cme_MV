@@ -1,0 +1,29 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  min-width: 320px;
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family:
+          "Microsoft YaHei",
+          "PingFang SC",
+          Arial,
+          sans-serif;
+  color: #303133;
+  background: #f4f6f9;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
