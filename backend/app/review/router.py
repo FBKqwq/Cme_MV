@@ -29,7 +29,7 @@ def load_repository(data_root: Path | None = None) -> None:
         repository = ReviewRepository(
             project_root=root.parents[1],
             inbox_root=root / "current",
-            database_path=root / "state" / "review.sqlite3",
+            result_root=root / "state" / "results",
             export_root=root / "state" / "exports",
             schema_path=(
                 root

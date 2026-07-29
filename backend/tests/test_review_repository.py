@@ -95,7 +95,7 @@ def make_task(
     return ReviewRepository(
         project_root=tmp_path,
         inbox_root=inbox,
-        database_path=review_root / "state" / "review.sqlite3",
+        result_root=review_root / "state" / "results",
         export_root=review_root / "state" / "exports",
         schema_path=schema_path,
     )
@@ -107,7 +107,7 @@ def test_import_and_task_hash_are_stable(tmp_path: Path) -> None:
     reloaded = ReviewRepository(
         project_root=tmp_path,
         inbox_root=repository.inbox_root,
-        database_path=repository.database_path,
+        result_root=repository.result_root,
         export_root=repository.export_root,
         schema_path=repository.schema_path,
     )
@@ -146,6 +146,15 @@ def test_entity_edit_creates_conflict_and_rejects_stale_version(
     assert edited["name"] == "复发性口腔溃疡"
     assert edited["review_canonical_id"].startswith("REVIEW_CANON_")
     assert detail["relationships"][0]["conflicts"][0]["code"] == "needs_rebind"
+    result_file = repository.result_root / "测试共识.review.json"
+    persisted = json.loads(result_file.read_text(encoding="utf-8"))
+    persisted_entity = next(
+        item for item in persisted["entities"] if item["entity_id"] == "E02"
+    )
+    assert persisted_entity["name"] == "口腔溃疡"
+    assert persisted_entity["review_flag"] == "modified"
+    assert persisted_entity["corrected_values"]["name"] == "复发性口腔溃疡"
+    assert not (repository.result_root.parent / "review.sqlite3").exists()
 
     with pytest.raises(HTTPException) as stale:
         repository.update_entity(
@@ -190,7 +199,7 @@ def test_approve_reload_and_final_export(tmp_path: Path) -> None:
     reloaded = ReviewRepository(
         project_root=tmp_path,
         inbox_root=repository.inbox_root,
-        database_path=repository.database_path,
+        result_root=repository.result_root,
         export_root=repository.export_root,
         schema_path=repository.schema_path,
     )
@@ -206,7 +215,9 @@ def test_approve_reload_and_final_export(tmp_path: Path) -> None:
             "review_manifest.json",
             "change_log.json",
             "review_checklist.json",
+            "results/测试共识.review.json",
         }.issubset(bundle.namelist())
+        assert "review_state.db" not in bundle.namelist()
         manifest = json.loads(bundle.read("review_manifest.json"))
         assert manifest["final"] is True
         assert manifest["review_version"] == approved["version"]

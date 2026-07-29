@@ -20,14 +20,6 @@ const handleUpload = (): void => {
 
 <template>
   <div class="home-page">
-    <el-alert
-        title="本系统预测结果仅用于临床辅助判断，不能替代医生最终诊断。"
-        type="warning"
-        :closable="false"
-        show-icon
-        class="warning-alert"
-    />
-
     <div class="welcome-section">
       <div>
         <h2>欢迎使用病因预测系统</h2>

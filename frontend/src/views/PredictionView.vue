@@ -133,7 +133,7 @@ const submitAnnotation = async (): Promise<void> => {
     })
 
     ElMessage.success(
-        '医生标注已保存到 PostgreSQL 数据库',
+        '医生标注已保存到本地结果目录',
     )
   } catch (error: unknown) {
     if (axios.isAxiosError(error)) {

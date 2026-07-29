@@ -14,7 +14,7 @@ from app.config import get_settings
 
 settings = get_settings()
 
-MODEL_PATH = settings.model_path
+MODEL_PATH = settings.model_file_path
 
 
 def make_json_safe(value: Any) -> Any:

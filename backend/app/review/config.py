@@ -11,6 +11,6 @@ REVIEW_DATA_ROOT = Path(
 ).resolve()
 INBOX_ROOT = REVIEW_DATA_ROOT / "current"
 REVIEW_ROOT = REVIEW_DATA_ROOT / "state"
-DATABASE_PATH = REVIEW_ROOT / "review.sqlite3"
+RESULT_ROOT = REVIEW_ROOT / "results"
 EXPORT_ROOT = REVIEW_ROOT / "exports"
 SCHEMA_PATH = INBOX_ROOT / "graph_property_schema_v3_6.json"

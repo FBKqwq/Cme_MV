@@ -1,6 +1,6 @@
 # 知识复验数据目录
 
-此目录由人工维护，不从 `base` 自动读取或同步。业务数据、复验数据库和导出文件均不提交到版本库。
+此目录由人工维护，不从 `base` 自动读取或同步。业务数据、复验结果集和导出文件均不提交到版本库。
 
 ## 必需结构
 
@@ -12,7 +12,8 @@ data/review/
 │   ├── raw_pdf/
 │   └── graph_property_schema_v3_6.json
 └── state/
-    ├── review.sqlite3
+    ├── results/
+    │   └── <PDF文件名>.review.json
     └── exports/
 ```
 
@@ -40,11 +41,34 @@ data/review/
 
 `raw_pdf` 为可选目录。PDF 文件名（不含扩展名）应与 `source_title` 一致；系统会建立 `doc_id` 到 PDF 的映射。重复匹配会导致复验模块进入降级状态，防止打开错误文档。
 
+## 复验结果格式
+
+后端启动后会为每个 PDF 初始化一个
+`state/results/<PDF文件名>.review.json`。其中 `entities` 包含该 PDF
+的全部实体。实体的原始字段和值始终保留；人工修改只写入
+`corrected_values`，不覆盖原字段。
+
+```json
+{
+  "entity_id": "E02",
+  "name": "口腔溃疡",
+  "entity_type": "symptoms",
+  "review_flag": "modified",
+  "corrected_values": {
+    "name": "复发性口腔溃疡"
+  }
+}
+```
+
+`review_flag` 可为 `pending`、`approved`、`modified`、`added` 或
+`deleted`。服务返回页面数据时会应用 `corrected_values`；结果文件本身
+仍同时保留原始值和修正值，便于审计、比对和下游转换。
+
 ## 替换数据
 
-1. 停止后端，备份 `state/review.sqlite3`。
+1. 停止后端，备份 `state/results`。
 2. 完整替换 `current` 下的数据，不要在服务运行时逐个覆盖文件。
-3. 如果新数据与旧数据不是同一批次，移走旧的 `state/review.sqlite3`，避免复验状态串批。
+3. 如果新数据与旧数据不是同一批次，移走旧的 `state/results`，避免复验状态串批。
 4. 重启后访问 `/api/review/health`，确认状态为 `ok`。
 
 缺少数据时，统一后端仍可启动，诊断模块可正常工作；知识复验接口会返回 `503 TASK_UNAVAILABLE`。

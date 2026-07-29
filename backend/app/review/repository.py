@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-import sqlite3
+import os
+import re
 import uuid
 import zipfile
 from collections import defaultdict
@@ -14,10 +15,10 @@ from typing import Any, Iterable
 from fastapi import HTTPException
 
 from .config import (
-    DATABASE_PATH,
     EXPORT_ROOT,
     INBOX_ROOT,
     PROJECT_ROOT,
+    RESULT_ROOT,
     SCHEMA_PATH,
 )
 
@@ -53,7 +54,7 @@ def file_sha256(path: Path) -> str:
 
 
 class ReviewRepository:
-    """Immutable source data plus a versioned SQLite review overlay."""
+    """Immutable source data plus one human-readable review JSON per PDF."""
 
     ENTITY_LABELS_ZH = {
         "diseases": "疾病",
@@ -81,21 +82,21 @@ class ReviewRepository:
         project_root: Path | None = None,
         *,
         inbox_root: Path | None = None,
-        database_path: Path | None = None,
+        result_root: Path | None = None,
         export_root: Path | None = None,
         schema_path: Path | None = None,
     ) -> None:
         self.project_root = project_root or PROJECT_ROOT
         self.inbox_root = inbox_root or INBOX_ROOT
-        self.database_path = database_path or DATABASE_PATH
+        self.result_root = result_root or RESULT_ROOT
         self.export_root = export_root or EXPORT_ROOT
         self.schema_path = schema_path or SCHEMA_PATH
-        self.database_path.parent.mkdir(parents=True, exist_ok=True)
+        self.result_root.mkdir(parents=True, exist_ok=True)
         self.export_root.mkdir(parents=True, exist_ok=True)
         self._load_source()
-        self._init_database()
         self._validate_source()
         self._sync_input_hash()
+        self._load_or_initialize_results()
 
     def _manifest_path(self) -> Path:
         return self.inbox_root / "chunks"
@@ -174,6 +175,7 @@ class ReviewRepository:
                     matched_doc = list(self.chunk_sources.keys())[0]
 
                 for rec in read_jsonl(ef):
+                    rec["_doc_id"] = matched_doc
                     cid = str(rec.get("chunk_id", ""))
                     if cid:
                         prefixed = f"{matched_doc}_{cid}"
@@ -184,7 +186,14 @@ class ReviewRepository:
         base_dir = self.inbox_root / "entity_base"
         if not self.entities and base_dir.exists():
             for ef in sorted(base_dir.glob("*.entity_base.jsonl")):
-                self.entities.extend(read_jsonl(ef))
+                for rec in read_jsonl(ef):
+                    document_id = str(rec.get("document_id", ""))
+                    rec["_doc_id"] = (
+                        document_id
+                        if document_id in self.chunk_sources
+                        else next(iter(self.chunk_sources))
+                    )
+                    self.entities.append(rec)
 
         self.entity_by_id = {str(e["entity_id"]): e for e in self.entities}
 
@@ -292,17 +301,18 @@ class ReviewRepository:
         type_to_schema = self.entity_contract_labels  # already maps type_value -> contract_label
 
         # Collect entities by chunk
-        by_chunk: dict[str, list[dict]] = {}
+        by_chunk: dict[tuple[str, str], list[dict]] = {}
         for e in self.entities:
             cid = str(e.get("chunk_id", ""))
-            if cid not in by_chunk:
-                by_chunk[cid] = []
-            by_chunk[cid].append(e)
+            group_key = (str(e.get("_doc_id", "")), cid)
+            if group_key not in by_chunk:
+                by_chunk[group_key] = []
+            by_chunk[group_key].append(e)
 
         relationships: list[dict] = []
         seen_pairs: set[tuple[str, str, str]] = set()  # (rel_type, src_id, tgt_id)
 
-        for cid, chunk_ents in by_chunk.items():
+        for (document_id, cid), chunk_ents in by_chunk.items():
             if not chunk_ents:
                 continue
             # Group by entity_type
@@ -355,6 +365,7 @@ class ReviewRepository:
                         rel_id = f"SYNTH_REL_{uuid.uuid4().hex[:12].upper()}"
                         relationships.append({
                             "relation_id": rel_id,
+                            "_doc_id": document_id,
                             "chunk_id": cid,
                             "source_chunk_id": cid,
                             "target_chunk_id": cid,
@@ -376,55 +387,107 @@ class ReviewRepository:
         self.relationships = relationships
         self.relationship_by_id = {str(r["relation_id"]): r for r in relationships}
 
-    def _init_database(self) -> None:
-        with self._connect() as connection:
-            connection.executescript(
-                """
-                CREATE TABLE IF NOT EXISTS meta (
-                    key TEXT PRIMARY KEY,
-                    value TEXT NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS overrides (
-                    kind TEXT NOT NULL,
-                    record_id TEXT NOT NULL,
-                    chunk_id TEXT NOT NULL,
-                    operation TEXT NOT NULL,
-                    scope TEXT NOT NULL DEFAULT 'current',
-                    payload_json TEXT NOT NULL,
-                    before_json TEXT,
-                    version INTEGER NOT NULL,
-                    updated_at TEXT NOT NULL,
-                    PRIMARY KEY (kind, record_id)
-                );
-                CREATE TABLE IF NOT EXISTS chunk_reviews (
-                    chunk_id TEXT PRIMARY KEY,
-                    status TEXT NOT NULL,
-                    has_changes INTEGER NOT NULL DEFAULT 0,
-                    version INTEGER NOT NULL,
-                    updated_at TEXT NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS audit_events (
-                    sequence INTEGER PRIMARY KEY AUTOINCREMENT,
-                    kind TEXT NOT NULL,
-                    record_id TEXT NOT NULL,
-                    chunk_id TEXT,
-                    action TEXT NOT NULL,
-                    before_json TEXT,
-                    after_json TEXT,
-                    version INTEGER NOT NULL,
-                    created_at TEXT NOT NULL
-                );
-                """
-            )
-            connection.execute(
-                "INSERT OR IGNORE INTO meta(key, value) VALUES('version', '0')"
-            )
-            connection.commit()
+    @staticmethod
+    def _safe_result_name(value: str) -> str:
+        cleaned = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", value).strip(" .")
+        return cleaned or "untitled"
 
-    def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.database_path)
-        connection.row_factory = sqlite3.Row
-        return connection
+    def _result_path(self, document_id: str) -> Path:
+        source = self.chunk_sources[document_id]
+        pdf = self.pdf_by_document_id.get(document_id)
+        stem = pdf.stem if pdf else str(source.get("title") or document_id)
+        return self.result_root / f"{self._safe_result_name(stem)}.review.json"
+
+    def _document_id_for_chunk(self, chunk_id: str) -> str:
+        chunk = self.chunk_by_id.get(chunk_id)
+        if not chunk:
+            raise HTTPException(status_code=404, detail="未找到该 chunk")
+        return str(chunk["_doc_id"])
+
+    @staticmethod
+    def _atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_suffix(path.suffix + f".{uuid.uuid4().hex}.tmp")
+        temporary.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        os.replace(temporary, path)
+
+    @staticmethod
+    def _source_result_entity(entity: dict[str, Any]) -> dict[str, Any]:
+        result = deepcopy(entity)
+        result.update(
+            {
+                "review_flag": "pending",
+                "review_operation": "source",
+                "review_scope": "current",
+                "corrected_values": {},
+                "review_version": 0,
+                "review_updated_at": None,
+            }
+        )
+        return result
+
+    def _new_document_result(self, document_id: str) -> dict[str, Any]:
+        entity_records = [
+            self._source_result_entity(entity)
+            for entity in self.entities
+            if str(entity.get("_doc_id", "")) == document_id
+        ]
+        relationship_records = [
+            self._source_result_entity(relation)
+            for relation in self.relationships
+            if str(relation.get("_doc_id", "")) == document_id
+        ]
+        source = self.chunk_sources[document_id]
+        pdf = self.pdf_by_document_id.get(document_id)
+        return {
+            "document_id": document_id,
+            "source_title": source.get("title"),
+            "source_pdf": pdf.name if pdf else None,
+            "schema_version": self.schema.get("schema_version"),
+            "input_hash": self.input_hash,
+            "version": 0,
+            "updated_at": None,
+            "entities": entity_records,
+            "canonical_entities": [],
+            "relationships": relationship_records,
+            "chunk_reviews": {},
+            "audit_events": [],
+        }
+
+    def _load_or_initialize_results(self) -> None:
+        self.results: dict[str, dict[str, Any]] = {}
+        for document_id in self.chunk_sources:
+            path = self._result_path(document_id)
+            if path.exists():
+                result = read_json(path)
+                if result.get("input_hash") != self.input_hash:
+                    changed = (
+                        any(
+                            entity.get("review_operation") != "source"
+                            for entity in result.get("entities", [])
+                        )
+                        or any(
+                            relation.get("review_operation") != "source"
+                            for relation in result.get("relationships", [])
+                        )
+                        or bool(result.get("chunk_reviews"))
+                    )
+                    if changed:
+                        raise ValueError(
+                            f"源文件已变化，但 {path.name} 中仍有旧修订。"
+                            "请先备份或迁移结果集。"
+                        )
+                    result = self._new_document_result(document_id)
+            else:
+                result = self._new_document_result(document_id)
+            self.results[document_id] = result
+            self._atomic_write_json(path, result)
+
+    def _save_result(self, document_id: str) -> None:
+        self._atomic_write_json(self._result_path(document_id), self.results[document_id])
 
     def _validate_source(self) -> None:
         issues: list[str] = []
@@ -469,37 +532,14 @@ class ReviewRepository:
         current_hash = hashlib.sha256(
             json.dumps(checksums, sort_keys=True).encode("utf-8")
         ).hexdigest()
-        with self._connect() as connection:
-            row = connection.execute(
-                "SELECT value FROM meta WHERE key='input_hash'"
-            ).fetchone()
-            if row and row["value"] != current_hash:
-                existing = connection.execute(
-                    "SELECT COUNT(*) AS total FROM overrides"
-                ).fetchone()["total"]
-                if existing:
-                    raise ValueError(
-                        "源文件已变化，但 SQLite 中仍有旧修订。"
-                        "请先备份并清理 data/review/state。"
-                    )
-            connection.execute(
-                "INSERT OR REPLACE INTO meta(key, value) VALUES('input_hash', ?)",
-                (current_hash,),
-            )
-            connection.execute(
-                "INSERT OR REPLACE INTO meta(key, value) VALUES('checksums', ?)",
-                (json.dumps(checksums, ensure_ascii=False),),
-            )
-            connection.commit()
         self.input_hash = current_hash
         self.checksums = checksums
+
     def version(self) -> int:
-        with self._connect() as connection:
-            return int(
-                connection.execute(
-                    "SELECT value FROM meta WHERE key='version'"
-                ).fetchone()["value"]
-            )
+        return max(
+            (int(result.get("version", 0)) for result in self.results.values()),
+            default=0,
+        )
 
     def _assert_version(self, base_version: int) -> None:
         current = self.version()
@@ -513,27 +553,48 @@ class ReviewRepository:
                 },
             )
 
-    def _next_version(self, connection: sqlite3.Connection) -> int:
-        current = int(
-            connection.execute(
-                "SELECT value FROM meta WHERE key='version'"
-            ).fetchone()["value"]
-        )
-        updated = current + 1
-        connection.execute(
-            "UPDATE meta SET value=? WHERE key='version'", (str(updated),)
-        )
-        return updated
-
-    def _overrides(self, kind: str) -> dict[str, sqlite3.Row]:
-        with self._connect() as connection:
-            rows = connection.execute(
-                "SELECT * FROM overrides WHERE kind=?", (kind,)
-            ).fetchall()
-        return {row["record_id"]: row for row in rows}
+    def _overrides(self, kind: str) -> dict[str, dict[str, Any]]:
+        collection = {
+            "entity": "entities",
+            "canonical": "canonical_entities",
+            "relationship": "relationships",
+        }[kind]
+        rows: dict[str, dict[str, Any]] = {}
+        id_key = "relation_id" if kind == "relationship" else "entity_id"
+        for result in self.results.values():
+            for record in result.get(collection, []):
+                operation = record.get("review_operation", "source")
+                if operation == "source":
+                    continue
+                corrected = deepcopy(record.get("corrected_values", {}))
+                if operation == "create":
+                    payload = {
+                        key: value
+                        for key, value in record.items()
+                        if key not in {
+                            "review_flag", "review_operation", "review_scope", "corrected_values",
+                            "review_version", "review_updated_at",
+                        }
+                    }
+                    payload.update(corrected)
+                else:
+                    payload = corrected
+                record_id = str(record[id_key])
+                rows[record_id] = {
+                    "kind": kind,
+                    "record_id": record_id,
+                    "chunk_id": str(record.get("chunk_id", "")),
+                    "operation": operation,
+                    "scope": record.get("review_scope", "current"),
+                    "payload_json": json.dumps(payload, ensure_ascii=False),
+                    "before_json": json.dumps(record, ensure_ascii=False),
+                    "version": int(record.get("review_version", 0)),
+                    "updated_at": record.get("review_updated_at"),
+                }
+        return rows
 
     @staticmethod
-    def _apply_override(record: dict[str, Any], row: sqlite3.Row) -> dict[str, Any]:
+    def _apply_override(record: dict[str, Any], row: dict[str, Any]) -> dict[str, Any]:
         projected = deepcopy(record)
         payload = {
             key: value
@@ -754,10 +815,11 @@ class ReviewRepository:
             result[relation_id] = conflicts
         return result
 
-    def _chunk_review_rows(self) -> dict[str, sqlite3.Row]:
-        with self._connect() as connection:
-            rows = connection.execute("SELECT * FROM chunk_reviews").fetchall()
-        return {row["chunk_id"]: row for row in rows}
+    def _chunk_review_rows(self) -> dict[str, dict[str, Any]]:
+        rows: dict[str, dict[str, Any]] = {}
+        for result in self.results.values():
+            rows.update(result.get("chunk_reviews", {}))
+        return rows
 
     def chunk_summaries(self, pending_only: bool = False) -> list[dict[str, Any]]:
         entities_by_chunk: dict[str, int] = defaultdict(int)
@@ -810,12 +872,11 @@ class ReviewRepository:
         return result
 
     def _chunk_has_override(self, chunk_id: str) -> bool:
-        with self._connect() as connection:
-            total = connection.execute(
-                "SELECT COUNT(*) AS total FROM overrides WHERE chunk_id=?",
-                (chunk_id,),
-            ).fetchone()["total"]
-        return bool(total)
+        return any(
+            row["chunk_id"] == chunk_id
+            for kind in ("entity", "relationship")
+            for row in self._overrides(kind).values()
+        )
 
     def task(self) -> dict[str, Any]:
         summaries = self.chunk_summaries()
@@ -933,64 +994,96 @@ class ReviewRepository:
     ) -> int:
         self._assert_version(base_version)
         timestamp = utc_now()
-        with self._connect() as connection:
-            version = self._next_version(connection)
-            connection.execute(
-                """
-                INSERT INTO overrides(
-                    kind, record_id, chunk_id, operation, scope, payload_json,
-                    before_json, version, updated_at
-                ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(kind, record_id) DO UPDATE SET
-                    chunk_id=excluded.chunk_id,
-                    operation=excluded.operation,
-                    scope=excluded.scope,
-                    payload_json=excluded.payload_json,
-                    before_json=COALESCE(overrides.before_json, excluded.before_json),
-                    version=excluded.version,
-                    updated_at=excluded.updated_at
-                """,
-                (
-                    kind,
-                    record_id,
-                    chunk_id,
-                    operation,
-                    scope,
-                    json.dumps(payload, ensure_ascii=False),
-                    json.dumps(before, ensure_ascii=False) if before else None,
-                    version,
-                    timestamp,
-                ),
-            )
-            connection.execute(
-                """
-                INSERT INTO audit_events(
-                    kind, record_id, chunk_id, action, before_json, after_json,
-                    version, created_at
-                ) VALUES(?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    kind,
-                    record_id,
-                    chunk_id,
-                    action,
-                    json.dumps(before, ensure_ascii=False) if before else None,
-                    json.dumps(payload, ensure_ascii=False),
-                    version,
-                    timestamp,
-                ),
-            )
-            connection.execute(
-                """
-                INSERT INTO chunk_reviews(chunk_id, status, has_changes, version, updated_at)
-                VALUES(?, 'pending', 1, ?, ?)
-                ON CONFLICT(chunk_id) DO UPDATE SET
-                    status='pending', has_changes=1,
-                    version=excluded.version, updated_at=excluded.updated_at
-                """,
-                (chunk_id, version, timestamp),
-            )
-            connection.commit()
+        version = self.version() + 1
+        document_id = self._document_id_for_chunk(chunk_id)
+        result = self.results[document_id]
+        collection = {
+            "entity": "entities",
+            "canonical": "canonical_entities",
+            "relationship": "relationships",
+        }[kind]
+        id_key = "relation_id" if kind == "relationship" else "entity_id"
+        record = next(
+            (
+                item
+                for item in result[collection]
+                if str(item.get(id_key)) == record_id
+            ),
+            None,
+        )
+        previous_operation = record.get("review_operation") if record else None
+        if record is None:
+            record = deepcopy(payload)
+            record["corrected_values"] = {}
+            result[collection].append(record)
+        elif operation == "create":
+            record.update(deepcopy(payload))
+        else:
+            public_payload = {
+                key: value for key, value in payload.items()
+                if not key.startswith("__restore_")
+            }
+            record.setdefault("corrected_values", {}).update(public_payload)
+            restore_metadata = {
+                key.removeprefix("__restore_"): value
+                for key, value in payload.items()
+                if key.startswith("__restore_")
+            }
+            if restore_metadata:
+                record["restore_metadata"] = restore_metadata
+
+        # An entity/relationship created during review remains an addition even
+        # when it is edited later, otherwise it would disappear after reload.
+        stored_operation = (
+            "create"
+            if previous_operation == "create" and operation == "update"
+            else operation
+        )
+
+        if stored_operation == "delete":
+            flag = "deleted"
+        elif stored_operation == "create":
+            flag = "added"
+        elif payload.get("status") == "accepted" and len(payload) == 1:
+            flag = "approved"
+        else:
+            flag = "modified"
+        record.update(
+            {
+                "review_flag": flag,
+                "review_operation": stored_operation,
+                "review_scope": scope,
+                "review_version": version,
+                "review_updated_at": timestamp,
+            }
+        )
+        result["chunk_reviews"][chunk_id] = {
+            "chunk_id": chunk_id,
+            "status": "pending",
+            "has_changes": True,
+            "version": version,
+            "updated_at": timestamp,
+        }
+        result["audit_events"].append(
+            {
+                "sequence": sum(
+                    len(item.get("audit_events", []))
+                    for item in self.results.values()
+                )
+                + 1,
+                "kind": kind,
+                "record_id": record_id,
+                "chunk_id": chunk_id,
+                "action": action,
+                "before": deepcopy(before),
+                "after": deepcopy(payload),
+                "version": version,
+                "created_at": timestamp,
+            }
+        )
+        result["version"] = version
+        result["updated_at"] = timestamp
+        self._save_result(document_id)
         return version
 
     def create_entity(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -1042,23 +1135,26 @@ class ReviewRepository:
             "source_chunk_ids": [chunk_id],
             "status": "review_added",
         }
-        with self._connect() as connection:
-            connection.execute(
-                """
-                INSERT OR REPLACE INTO overrides(
-                    kind, record_id, chunk_id, operation, scope, payload_json,
-                    before_json, version, updated_at
-                ) VALUES('canonical', ?, ?, 'create', 'current', ?, NULL, ?, ?)
-                """,
-                (
-                    canonical_id,
-                    chunk_id,
-                    json.dumps(canonical, ensure_ascii=False),
-                    version,
-                    timestamp,
-                ),
-            )
-            connection.commit()
+        document_id = self._document_id_for_chunk(chunk_id)
+        canonical.update(
+            {
+                "chunk_id": chunk_id,
+                "review_flag": "added",
+                "review_operation": "create",
+                "review_scope": "current",
+                "corrected_values": {},
+                "review_version": version,
+                "review_updated_at": timestamp,
+            }
+        )
+        result = self.results[document_id]
+        result["canonical_entities"] = [
+            item
+            for item in result["canonical_entities"]
+            if str(item.get("entity_id")) != canonical_id
+        ]
+        result["canonical_entities"].append(canonical)
+        self._save_result(document_id)
 
     def update_entity(self, entity_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         source = self.entity_by_id.get(entity_id)
@@ -1155,60 +1251,83 @@ class ReviewRepository:
     def restore_entity(
         self, entity_id: str, *, chunk_id: str, base_version: int
     ) -> dict[str, Any]:
-        self._assert_version(base_version)
-        with self._connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM overrides WHERE kind='entity' AND record_id=?",
-                (entity_id,),
-            ).fetchone()
-            if not row or row["operation"] != "delete":
-                raise HTTPException(status_code=404, detail="该实体没有可恢复的删除记录")
-            version = self._next_version(connection)
-            payload = json.loads(row["payload_json"])
-            restore_operation = payload.pop("__restore_operation", None)
-            restore_scope = payload.pop("__restore_scope", "current")
-            if restore_operation:
-                connection.execute(
-                    """
-                    UPDATE overrides SET operation=?, scope=?, payload_json=?,
-                        version=?, updated_at=?
-                    WHERE kind='entity' AND record_id=?
-                    """,
-                    (
-                        restore_operation,
-                        restore_scope,
-                        json.dumps(payload, ensure_ascii=False),
-                        version,
-                        utc_now(),
-                        entity_id,
-                    ),
-                )
-            else:
-                connection.execute(
-                    "DELETE FROM overrides WHERE kind='entity' AND record_id=?",
-                    (entity_id,),
-                )
-            connection.execute(
-                """
-                INSERT INTO audit_events(
-                    kind, record_id, chunk_id, action, before_json, after_json,
-                    version, created_at
-                ) VALUES('entity', ?, ?, 'restore', ?, NULL, ?, ?)
-                """,
-                (entity_id, chunk_id, row["payload_json"], version, utc_now()),
-            )
-            connection.execute(
-                """
-                INSERT INTO chunk_reviews(chunk_id, status, has_changes, version, updated_at)
-                VALUES(?, 'pending', 1, ?, ?)
-                ON CONFLICT(chunk_id) DO UPDATE SET
-                    status='pending', has_changes=1,
-                    version=excluded.version, updated_at=excluded.updated_at
-                """,
-                (chunk_id, version, utc_now()),
-            )
-            connection.commit()
+        version = self._restore_record(
+            kind="entity",
+            record_id=entity_id,
+            chunk_id=chunk_id,
+            base_version=base_version,
+        )
         return {"entity_id": entity_id, "version": version}
+
+    def _restore_record(
+        self,
+        *,
+        kind: str,
+        record_id: str,
+        chunk_id: str,
+        base_version: int,
+    ) -> int:
+        self._assert_version(base_version)
+        document_id = self._document_id_for_chunk(chunk_id)
+        result = self.results[document_id]
+        collection = "entities" if kind == "entity" else "relationships"
+        id_key = "entity_id" if kind == "entity" else "relation_id"
+        record = next(
+            (
+                item for item in result[collection]
+                if str(item.get(id_key)) == record_id
+            ),
+            None,
+        )
+        if not record or record.get("review_operation") != "delete":
+            label = "实体" if kind == "entity" else "关系"
+            raise HTTPException(status_code=404, detail=f"该{label}没有可恢复的删除记录")
+
+        timestamp = utc_now()
+        version = self.version() + 1
+        metadata = record.pop("restore_metadata", {})
+        previous_operation = metadata.get("operation")
+        if previous_operation:
+            record["review_operation"] = previous_operation
+            record["review_scope"] = metadata.get("scope", "current")
+            record["review_flag"] = (
+                "added" if previous_operation == "create" else "modified"
+            )
+        else:
+            record["review_operation"] = "source"
+            record["review_scope"] = "current"
+            record["review_flag"] = "pending"
+            record["corrected_values"] = {}
+        record["review_version"] = version
+        record["review_updated_at"] = timestamp
+        result["chunk_reviews"][chunk_id] = {
+            "chunk_id": chunk_id,
+            "status": "pending",
+            "has_changes": self._chunk_has_override(chunk_id),
+            "version": version,
+            "updated_at": timestamp,
+        }
+        result["audit_events"].append(
+            {
+                "sequence": sum(
+                    len(item.get("audit_events", []))
+                    for item in self.results.values()
+                )
+                + 1,
+                "kind": kind,
+                "record_id": record_id,
+                "chunk_id": chunk_id,
+                "action": "restore",
+                "before": {"review_flag": "deleted"},
+                "after": None,
+                "version": version,
+                "created_at": timestamp,
+            }
+        )
+        result["version"] = version
+        result["updated_at"] = timestamp
+        self._save_result(document_id)
+        return version
 
     def create_relationship(self, payload: dict[str, Any]) -> dict[str, Any]:
         if payload["relation_type"] not in self.relation_definitions:
@@ -1314,49 +1433,12 @@ class ReviewRepository:
     def restore_relationship(
         self, relation_id: str, *, chunk_id: str, base_version: int
     ) -> dict[str, Any]:
-        self._assert_version(base_version)
-        with self._connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM overrides WHERE kind='relationship' AND record_id=?",
-                (relation_id,),
-            ).fetchone()
-            if not row or row["operation"] != "delete":
-                raise HTTPException(status_code=404, detail="该关系没有可恢复的删除记录")
-            version = self._next_version(connection)
-            payload = json.loads(row["payload_json"])
-            restore_operation = payload.pop("__restore_operation", None)
-            restore_scope = payload.pop("__restore_scope", "current")
-            if restore_operation:
-                connection.execute(
-                    """
-                    UPDATE overrides SET operation=?, scope=?, payload_json=?,
-                        version=?, updated_at=?
-                    WHERE kind='relationship' AND record_id=?
-                    """,
-                    (
-                        restore_operation,
-                        restore_scope,
-                        json.dumps(payload, ensure_ascii=False),
-                        version,
-                        utc_now(),
-                        relation_id,
-                    ),
-                )
-            else:
-                connection.execute(
-                    "DELETE FROM overrides WHERE kind='relationship' AND record_id=?",
-                    (relation_id,),
-                )
-            connection.execute(
-                """
-                INSERT INTO audit_events(
-                    kind, record_id, chunk_id, action, before_json, after_json,
-                    version, created_at
-                ) VALUES('relationship', ?, ?, 'restore', ?, NULL, ?, ?)
-                """,
-                (relation_id, chunk_id, row["payload_json"], version, utc_now()),
-            )
-            connection.commit()
+        version = self._restore_record(
+            kind="relationship",
+            record_id=relation_id,
+            chunk_id=chunk_id,
+            base_version=base_version,
+        )
         return {"relation_id": relation_id, "version": version}
 
     def approve_chunk(self, chunk_id: str, base_version: int) -> dict[str, Any]:
@@ -1378,57 +1460,48 @@ class ReviewRepository:
                 },
             )
         timestamp = utc_now()
-        with self._connect() as connection:
-            version = self._next_version(connection)
-            connection.execute(
-                """
-                INSERT INTO chunk_reviews(chunk_id, status, has_changes, version, updated_at)
-                VALUES(?, 'approved', ?, ?, ?)
-                ON CONFLICT(chunk_id) DO UPDATE SET
-                    status='approved',
-                    version=excluded.version,
-                    updated_at=excluded.updated_at
-                """,
-                (chunk_id, int(self._chunk_has_override(chunk_id)), version, timestamp),
-            )
-            connection.execute(
-                """
-                INSERT INTO audit_events(
-                    kind, record_id, chunk_id, action, before_json, after_json,
-                    version, created_at
-                ) VALUES('chunk', ?, ?, 'approve', NULL, ?, ?, ?)
-                """,
-                (
-                    chunk_id,
-                    chunk_id,
-                    json.dumps({"status": "approved"}, ensure_ascii=False),
-                    version,
-                    timestamp,
-                ),
-            )
-            connection.commit()
+        version = self.version() + 1
+        document_id = self._document_id_for_chunk(chunk_id)
+        result = self.results[document_id]
+        result["chunk_reviews"][chunk_id] = {
+            "chunk_id": chunk_id,
+            "status": "approved",
+            "has_changes": self._chunk_has_override(chunk_id),
+            "version": version,
+            "updated_at": timestamp,
+        }
+        result["audit_events"].append(
+            {
+                "sequence": sum(
+                    len(item.get("audit_events", []))
+                    for item in self.results.values()
+                )
+                + 1,
+                "kind": "chunk",
+                "record_id": chunk_id,
+                "chunk_id": chunk_id,
+                "action": "approve",
+                "before": None,
+                "after": {"status": "approved"},
+                "version": version,
+                "created_at": timestamp,
+            }
+        )
+        result["version"] = version
+        result["updated_at"] = timestamp
+        self._save_result(document_id)
         return {"chunk_id": chunk_id, "status": "approved", "version": version}
 
     def _audit_log(self) -> list[dict[str, Any]]:
-        with self._connect() as connection:
-            rows = connection.execute(
-                "SELECT * FROM audit_events ORDER BY sequence"
-            ).fetchall()
-        return [
-            {
-                **dict(row),
-                "before": json.loads(row["before_json"])
-                if row["before_json"]
-                else None,
-                "after": json.loads(row["after_json"])
-                if row["after_json"]
-                else None,
-            }
-            for row in rows
+        rows = [
+            deepcopy(event)
+            for result in self.results.values()
+            for event in result.get("audit_events", [])
         ]
+        return sorted(rows, key=lambda item: int(item.get("sequence", 0)))
 
     def import_review(self, zip_path: Path) -> dict[str, Any]:
-        """Import a previously exported review session ZIP, restoring SQLite state."""
+        """Import per-PDF review JSON files from a review export."""
         if not zip_path.exists():
             raise HTTPException(status_code=404, detail=f"未找到导入文件：{zip_path}")
 
@@ -1436,23 +1509,41 @@ class ReviewRepository:
             names = bundle.namelist()
             if "review_manifest.json" not in names:
                 raise HTTPException(status_code=422, detail="无效的复验导出包：缺少 review_manifest.json")
-            if "review_state.db" not in names:
-                raise HTTPException(status_code=422, detail="导出包中缺少复验状态数据库(review_state.db)，无法导入。请使用新版导出。")
+            result_names = [
+                name for name in names
+                if name.startswith("results/") and name.endswith(".review.json")
+            ]
+            if not result_names:
+                raise HTTPException(
+                    status_code=422,
+                    detail="导出包中缺少 results/*.review.json，无法导入。",
+                )
 
             manifest = json.loads(bundle.read("review_manifest.json").decode("utf-8"))
-            if self.database_path.exists():
-                import shutil
-                backup = self.database_path.with_suffix(".sqlite3.bak")
-                shutil.copy2(self.database_path, backup)
+            imported: dict[str, dict[str, Any]] = {}
+            for name in result_names:
+                payload = json.loads(bundle.read(name).decode("utf-8"))
+                document_id = str(payload.get("document_id", ""))
+                if document_id not in self.chunk_sources:
+                    raise HTTPException(
+                        status_code=422,
+                        detail=f"结果集引用了未知文档：{document_id}",
+                    )
+                if payload.get("input_hash") != self.input_hash:
+                    raise HTTPException(
+                        status_code=422,
+                        detail=f"结果集与当前源数据不匹配：{document_id}",
+                    )
+                imported[document_id] = payload
+            if set(imported) != set(self.chunk_sources):
+                raise HTTPException(
+                    status_code=422,
+                    detail="导入包没有覆盖当前任务的全部 PDF。",
+                )
+            self.results = imported
+            for document_id in imported:
+                self._save_result(document_id)
 
-            bundle.extract("review_state.db", self.database_path.parent)
-            restored = self.database_path.parent / "review_state.db"
-            if restored != self.database_path:
-                if self.database_path.exists():
-                    self.database_path.unlink()
-                restored.rename(self.database_path)
-
-        self._init_database()
         return {
             "version": manifest.get("review_version", 0),
             "final": manifest.get("final", False),
@@ -1500,6 +1591,9 @@ class ReviewRepository:
             ).encode("utf-8")
 
         with zipfile.ZipFile(export_path, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
+            for document_id in self.chunk_sources:
+                path = self._result_path(document_id)
+                bundle.writestr(f"results/{path.name}", path.read_bytes())
             bundle.writestr("reviewed_entities.jsonl", jsonl_bytes(entities))
             bundle.writestr(
                 "reviewed_canonical_entities.jsonl", jsonl_bytes(canonicals)
@@ -1521,7 +1615,4 @@ class ReviewRepository:
                     self.chunk_summaries(), ensure_ascii=False, indent=2
                 ).encode("utf-8"),
             )
-            # Include SQLite database so review state is portable
-            if self.database_path.exists():
-                bundle.writestr("review_state.db", self.database_path.read_bytes())
         return export_path

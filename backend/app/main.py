@@ -1,21 +1,16 @@
 from collections import Counter
 from contextlib import asynccontextmanager
-from typing import Annotated
 
 from fastapi import (
     BackgroundTasks,
-    Depends,
     FastAPI,
     HTTPException,
     status,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import select, text
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session, selectinload
 
 from app.config import get_settings
-from app.database import Base, engine, get_db
+from app.file_repository import file_repository
 from app.model_service import model_service
 from app.models import (
     Annotation,
@@ -46,11 +41,6 @@ from app.review.router import (
 
 
 settings = get_settings()
-
-DBSession = Annotated[
-    Session,
-    Depends(get_db),
-]
 
 
 def get_current_model_version() -> str:
@@ -86,12 +76,6 @@ async def lifespan(_: FastAPI):
     FastAPI 应用生命周期。
     """
 
-    # 只创建不存在的表。
-    # 已有数据库字段修改仍然使用 Alembic。
-    Base.metadata.create_all(
-        bind=engine,
-    )
-
     # 应用启动时加载当前正式模型。
     model_service.load()
 
@@ -102,7 +86,7 @@ async def lifespan(_: FastAPI):
     )
 
     # 复验数据可由人工维护；缺失时仅将复验模块标记为 degraded。
-    load_review_repository(settings.review_data_root)
+    load_review_repository(settings.review_data_path)
 
     yield
 
@@ -161,20 +145,12 @@ def get_model_info() -> dict:
 )
 def create_case_and_real_prediction(
     payload: CaseCreate,
-    db: DBSession,
 ) -> CasePredictionResponse:
     """
     保存病例并调用真实机器学习模型预测。
     """
 
-    existing_case = db.scalar(
-        select(PatientCase).where(
-            PatientCase.case_code
-            == payload.case_code
-        )
-    )
-
-    if existing_case is not None:
+    if file_repository.existing_case_codes([payload.case_code]):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="该病例编号已经存在。",
@@ -239,11 +215,7 @@ def create_case_and_real_prediction(
         features=feature_values,
     )
 
-    db.add(case_record)
-
     try:
-        db.flush()
-
         model_version = (
             get_current_model_version()
         )
@@ -257,7 +229,7 @@ def create_case_and_real_prediction(
         }
 
         prediction_record = Prediction(
-            case_id=case_record.id,
+            case_id=0,
             predicted_label=str(
                 prediction_result[
                     "predicted_label"
@@ -267,20 +239,19 @@ def create_case_and_real_prediction(
             model_version=model_version,
         )
 
-        db.add(prediction_record)
-        db.commit()
+        case_record, prediction_record = (
+            file_repository.create_case_with_prediction(
+                case_record,
+                prediction_record,
+            )
+        )
 
-        db.refresh(case_record)
-        db.refresh(prediction_record)
-
-    except SQLAlchemyError as exc:
-        db.rollback()
-
+    except (OSError, ValueError) as exc:
         raise HTTPException(
             status_code=(
                 status.HTTP_500_INTERNAL_SERVER_ERROR
             ),
-            detail="预测完成，但数据库保存失败。",
+            detail="预测完成，但文件保存失败。",
         ) from exc
 
     return CasePredictionResponse(
@@ -300,26 +271,12 @@ def create_case_and_real_prediction(
     response_model=list[CaseHistoryItem],
 )
 def list_case_history(
-    db: DBSession,
 ) -> list[CaseHistoryItem]:
     """
     返回病例历史记录。
     """
 
-    case_records = db.scalars(
-        select(PatientCase)
-        .options(
-            selectinload(
-                PatientCase.predictions
-            ),
-            selectinload(
-                PatientCase.annotations
-            ),
-        )
-        .order_by(
-            PatientCase.id.desc()
-        )
-    ).all()
+    case_records = file_repository.list_cases()
 
     history_items: list[
         CaseHistoryItem
@@ -378,52 +335,14 @@ def health_check() -> dict[str, str]:
     }
 
 
-@app.get("/api/db-health")
-def database_health_check() -> dict[str, str]:
-    """
-    检查 PostgreSQL 数据库连接。
-    """
-
-    try:
-        with engine.connect() as connection:
-            database = connection.scalar(
-                text(
-                    "SELECT current_database()"
-                )
-            )
-
-            user = connection.scalar(
-                text(
-                    "SELECT current_user"
-                )
-            )
-
-            version = connection.scalar(
-                text(
-                    "SHOW server_version"
-                )
-            )
-
-        return {
-            "status": "ok",
-            "message": (
-                "PostgreSQL 数据库连接正常"
-            ),
-            "database": str(database),
-            "user": str(user),
-            "postgresql_version": str(version),
-        }
-
-    except SQLAlchemyError as exc:
-        raise HTTPException(
-            status_code=(
-                status.HTTP_503_SERVICE_UNAVAILABLE
-            ),
-            detail=(
-                "数据库连接失败，"
-                "请检查 .env 配置。"
-            ),
-        ) from exc
+@app.get("/api/storage-health")
+def storage_health_check() -> dict[str, str]:
+    """检查项目相对目录中的文件存储。"""
+    return {
+        "status": "ok",
+        "message": "JSON 文件存储可用",
+        "runtime_data_root": settings.runtime_data_root.as_posix(),
+    }
 
 
 @app.get(
@@ -431,21 +350,12 @@ def database_health_check() -> dict[str, str]:
     response_model=list[CaseResponse],
 )
 def list_cases(
-    db: DBSession,
 ) -> list[PatientCase]:
     """
     返回全部病例。
     """
 
-    result = db.scalars(
-        select(PatientCase).order_by(
-            PatientCase.id.desc()
-        )
-    )
-
-    return list(
-        result.all()
-    )
+    return file_repository.list_cases()
 
 
 @app.post(
@@ -455,7 +365,6 @@ def list_cases(
 )
 def batch_predict_cases(
     payload: BatchPredictionRequest,
-    db: DBSession,
 ) -> BatchPredictionResponse:
     """
     批量保存病例并执行预测。
@@ -492,17 +401,7 @@ def batch_predict_cases(
             ),
         )
 
-    existing_case_codes = list(
-        db.scalars(
-            select(
-                PatientCase.case_code
-            ).where(
-                PatientCase.case_code.in_(
-                    case_codes
-                )
-            )
-        ).all()
-    )
+    existing_case_codes = file_repository.existing_case_codes(case_codes)
 
     if existing_case_codes:
         raise HTTPException(
@@ -510,7 +409,7 @@ def batch_predict_cases(
                 status.HTTP_409_CONFLICT
             ),
             detail=(
-                "数据库中已经存在以下病例编号："
+                "结果目录中已经存在以下病例编号："
                 + "、".join(
                     sorted(
                         existing_case_codes
@@ -530,6 +429,10 @@ def batch_predict_cases(
     result_items: list[
         BatchPredictionResultItem
     ] = []
+    pending_records: list[
+        tuple[PatientCase, Prediction]
+    ] = []
+    excel_rows: list[int] = []
 
     try:
         for row in payload.rows:
@@ -615,9 +518,6 @@ def batch_predict_cases(
                 features=feature_values,
             )
 
-            db.add(case_record)
-            db.flush()
-
             probabilities = {
                 str(label): float(value)
                 for label, value
@@ -627,7 +527,7 @@ def batch_predict_cases(
             }
 
             prediction_record = Prediction(
-                case_id=case_record.id,
+                case_id=0,
                 predicted_label=str(
                     prediction_result[
                         "predicted_label"
@@ -637,12 +537,23 @@ def batch_predict_cases(
                 model_version=model_version,
             )
 
-            db.add(prediction_record)
-            db.flush()
+            pending_records.append(
+                (case_record, prediction_record)
+            )
+            excel_rows.append(row.excel_row)
 
+        created_records = (
+            file_repository.create_cases_with_predictions(
+                pending_records
+            )
+        )
+        for excel_row, (
+            case_record,
+            prediction_record,
+        ) in zip(excel_rows, created_records, strict=True):
             result_items.append(
                 BatchPredictionResultItem(
-                    excel_row=row.excel_row,
+                    excel_row=excel_row,
                     case_id=case_record.id,
                     case_code=(
                         case_record.case_code
@@ -657,15 +568,10 @@ def batch_predict_cases(
                 )
             )
 
-        db.commit()
-
     except HTTPException:
-        db.rollback()
         raise
 
-    except SQLAlchemyError as exc:
-        db.rollback()
-
+    except (OSError, ValueError) as exc:
         raise HTTPException(
             status_code=(
                 status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -677,8 +583,6 @@ def batch_predict_cases(
         ) from exc
 
     except Exception as exc:
-        db.rollback()
-
         raise HTTPException(
             status_code=(
                 status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -707,26 +611,12 @@ def batch_predict_cases(
 )
 def get_case(
     case_id: int,
-    db: DBSession,
 ) -> CaseDetailResponse:
     """
     返回病例、最近预测和最近医生标注。
     """
 
-    case_record = db.scalar(
-        select(PatientCase)
-        .options(
-            selectinload(
-                PatientCase.predictions
-            ),
-            selectinload(
-                PatientCase.annotations
-            ),
-        )
-        .where(
-            PatientCase.id == case_id
-        )
-    )
+    case_record = file_repository.get_case(case_id)
 
     if case_record is None:
         raise HTTPException(
@@ -778,7 +668,6 @@ def create_annotation(
     case_id: int,
     payload: AnnotationCreate,
     background_tasks: BackgroundTasks,
-    db: DBSession,
 ) -> Annotation:
     """
     保存医生确认的真实诊断。
@@ -788,10 +677,7 @@ def create_annotation(
     并在接口返回后执行后台训练。
     """
 
-    case_record = db.get(
-        PatientCase,
-        case_id,
-    )
+    case_record = file_repository.get_case(case_id)
 
     if case_record is None:
         raise HTTPException(
@@ -811,13 +697,10 @@ def create_annotation(
     )
 
     try:
-        db.add(annotation_record)
-        db.commit()
-        db.refresh(annotation_record)
-
-    except SQLAlchemyError as exc:
-        db.rollback()
-
+        annotation_record = file_repository.add_annotation(
+            annotation_record
+        )
+    except OSError as exc:
         raise HTTPException(
             status_code=(
                 status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -826,15 +709,9 @@ def create_annotation(
         ) from exc
 
     try:
-        training_job = (
-            create_training_job_if_needed(
-                db
-            )
-        )
+        training_job = create_training_job_if_needed()
 
-    except SQLAlchemyError as exc:
-        db.rollback()
-
+    except OSError as exc:
         print(
             "检查自动训练任务失败：",
             repr(exc),

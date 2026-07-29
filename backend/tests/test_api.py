@@ -1,30 +1,12 @@
 import os
-from pathlib import Path
-
-import pytest
-from dotenv import dotenv_values
 from fastapi.testclient import TestClient
 
-DATABASE_ENV = ("DB_USER", "DB_PASSWORD", "DB_NAME")
-env_file = Path(__file__).resolve().parents[1] / ".env"
-database_settings = {
-    **dotenv_values(env_file),
-    **os.environ,
-}
-database_configured = all(
-    database_settings.get(name)
-    for name in DATABASE_ENV
+os.environ.setdefault(
+    "RUNTIME_DATA_ROOT",
+    "backend/artifacts/test-runtime",
 )
 
-if database_configured:
-    from app.main import app
-else:
-    app = None
-
-pytestmark = pytest.mark.skipif(
-    not database_configured,
-    reason="诊断 API 集成测试需要配置 PostgreSQL 环境变量",
-)
+from app.main import app
 
 
 def test_health_endpoint() -> None:
@@ -34,11 +16,12 @@ def test_health_endpoint() -> None:
     assert response.status_code == 200
 
 
-def test_database_health_endpoint() -> None:
+def test_storage_health_endpoint() -> None:
     with TestClient(app) as client:
-        response = client.get("/api/db-health")
+        response = client.get("/api/storage-health")
 
     assert response.status_code == 200
+    assert response.json()["runtime_data_root"] == "backend/artifacts/test-runtime"
 
 
 def test_model_info_endpoint() -> None:

@@ -21,6 +21,8 @@ frontend/.env
 
 # 训练数据：不要上传患者数据
 ml/data/
+data/runtime/*
+!data/runtime/.gitkeep
 
 # 训练阶段输出，正式使用的是 backend/models 中的模型
 ml/output/

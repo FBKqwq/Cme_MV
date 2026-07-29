@@ -18,13 +18,11 @@ from sklearn.metrics import balanced_accuracy_score, f1_score, log_loss
 from sklearn.model_selection import GridSearchCV, StratifiedKFold, train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
-from sqlalchemy import select
-from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.database import engine
+from app.file_repository import file_repository
 from app.model_service import model_service
-from app.models import Annotation, ModelVersion, TrainingJob
+from app.models import ModelVersion
 from app.training_dataset_service import build_training_dataset
 
 
@@ -378,114 +376,107 @@ def execute_training_job(job_id: int) -> None:
     """
     执行一个 queued 训练任务。
 
-    该函数供 FastAPI BackgroundTasks 调用，因此内部必须创建独立数据库会话。
+    该函数供 FastAPI BackgroundTasks 调用，状态通过 JSON 文件仓储持久化。
     第一版只生成 candidate，不替换正式模型。
     """
 
     annotation_ids: list[int] = []
 
     try:
-        with Session(engine) as db:
-            job = db.get(TrainingJob, job_id)
-            if job is None or job.status != "queued":
-                return
+        job = file_repository.get_training_job(job_id)
+        if job is None or job.status != "queued":
+            return
 
-            job.status = "running"
-            job.started_at = _utc_now()
-            job.message = "正在读取医生确认标注并训练候选模型"
-            db.commit()
+        job.status = "running"
+        job.started_at = _utc_now()
+        job.message = "正在读取医生确认标注并训练候选模型"
+        file_repository.save_training_job(job)
 
-            if model_service.package is None:
-                model_service.load()
+        if model_service.package is None:
+            model_service.load()
 
-            feature_columns = list(model_service.feature_columns)
-            current_package = model_service.package or {}
-            class_labels = [
-                str(item)
-                for item in current_package.get(
-                    "class_labels",
-                    ["其他", "炎症", "感染", "肿瘤"],
-                )
-            ]
+        feature_columns = list(model_service.feature_columns)
+        current_package = model_service.package or {}
+        class_labels = [
+            str(item)
+            for item in current_package.get(
+                "class_labels",
+                ["其他", "炎症", "感染", "肿瘤"],
+            )
+        ]
 
-            dataset = build_training_dataset(db, feature_columns)
-            annotation_ids = dataset.annotation_ids
+        dataset = build_training_dataset(feature_columns)
+        annotation_ids = dataset.annotation_ids
 
-            _validate_dataset(dataset.features, dataset.target, class_labels)
+        _validate_dataset(dataset.features, dataset.target, class_labels)
 
-            package, metrics, best_model_name = _train_candidate(
-                dataset.features,
-                dataset.target,
-                class_labels,
+        package, metrics, best_model_name = _train_candidate(
+            dataset.features,
+            dataset.target,
+            class_labels,
+        )
+
+        version = "candidate-" + datetime.now().strftime("%Y%m%d-%H%M%S")
+        settings.model_versions_path.mkdir(parents=True, exist_ok=True)
+        candidate_path = settings.model_versions_path / f"{version}.joblib"
+
+        temporary_path = candidate_path.with_suffix(".tmp.joblib")
+        if temporary_path.exists():
+            temporary_path.unlink()
+
+        joblib.dump(package, temporary_path, compress=3)
+        _verify_candidate(temporary_path, dataset.features)
+        temporary_path.replace(candidate_path)
+
+        parent_version = None
+        if current_package:
+            parent_version = str(
+                current_package.get("package_version", "unknown")
             )
 
-            version = (
-                "candidate-"
-                + datetime.now().strftime("%Y%m%d-%H%M%S")
-            )
-            settings.model_versions_dir.mkdir(parents=True, exist_ok=True)
-            candidate_path = settings.model_versions_dir / f"{version}.joblib"
+        relative_model_path = candidate_path.relative_to(
+            settings.project_root
+        ).as_posix()
+        model_version = ModelVersion(
+            version=version,
+            model_name=best_model_name,
+            file_path=relative_model_path,
+            status="candidate",
+            sample_count=len(dataset.target),
+            macro_f1=metrics["macro_f1"],
+            balanced_accuracy=metrics["balanced_accuracy"],
+            log_loss=metrics["log_loss"],
+            parent_version=parent_version,
+        )
 
-            temporary_path = candidate_path.with_suffix(".tmp.joblib")
-            if temporary_path.exists():
-                temporary_path.unlink()
-
-            joblib.dump(package, temporary_path, compress=3)
-            _verify_candidate(temporary_path, dataset.features)
-            temporary_path.replace(candidate_path)
-
-            parent_version = None
-            if current_package:
-                parent_version = str(
-                    current_package.get("package_version", "unknown")
-                )
-
-            model_version = ModelVersion(
-                version=version,
-                model_name=best_model_name,
-                file_path=str(candidate_path),
-                status="candidate",
-                sample_count=len(dataset.target),
-                macro_f1=metrics["macro_f1"],
-                balanced_accuracy=metrics["balanced_accuracy"],
-                log_loss=metrics["log_loss"],
-                parent_version=parent_version,
-            )
-            db.add(model_version)
-
-            annotations = db.scalars(
-                select(Annotation).where(Annotation.id.in_(annotation_ids))
-            ).all()
-            for annotation in annotations:
-                annotation.training_status = "included"
-                annotation.trained_model_version = version
-
-            job.status = "succeeded"
-            job.candidate_version = version
-            job.finished_at = _utc_now()
-            job.message = (
-                "候选模型训练完成；"
-                f"模型={best_model_name}，"
-                f"样本数={len(dataset.target)}，"
-                f"Macro-F1={metrics['macro_f1']:.4f}"
-            )
-            db.commit()
+        job.status = "succeeded"
+        job.candidate_version = version
+        job.finished_at = _utc_now()
+        job.message = (
+            "候选模型训练完成；"
+            f"模型={best_model_name}，"
+            f"样本数={len(dataset.target)}，"
+            f"Macro-F1={metrics['macro_f1']:.4f}"
+        )
+        file_repository.complete_training(
+            job,
+            model_version,
+            annotation_ids,
+        )
 
     except ValueError as exc:
-        with Session(engine) as db:
-            job = db.get(TrainingJob, job_id)
-            if job is not None:
-                job.status = "rejected"
-                job.finished_at = _utc_now()
-                job.message = str(exc)[:1000]
-                db.commit()
+        job = file_repository.get_training_job(job_id)
+        if job is not None:
+            job.status = "rejected"
+            job.finished_at = _utc_now()
+            job.message = str(exc)[:1000]
+            file_repository.save_training_job(job)
 
     except Exception as exc:
-        with Session(engine) as db:
-            job = db.get(TrainingJob, job_id)
-            if job is not None:
-                job.status = "failed"
-                job.finished_at = _utc_now()
-                job.message = f"训练失败：{type(exc).__name__}: {exc}"[:1000]
-                db.commit()
+        job = file_repository.get_training_job(job_id)
+        if job is not None:
+            job.status = "failed"
+            job.finished_at = _utc_now()
+            job.message = f"训练失败：{type(exc).__name__}: {exc}"[:1000]
+            file_repository.save_training_job(job)
         raise
