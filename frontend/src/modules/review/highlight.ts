@@ -52,7 +52,6 @@ export function buildHighlightSegments(
   const matches: Array<{ start: number; end: number; entity: EntityRecord }> = [];
 
   for (const entity of entities) {
-    if (entity._review.deleted) continue;
     let best: { start: number; end: number } | undefined;
     for (const candidate of evidenceCandidates(entity)) {
       const normalizedCandidate = normalizeWithMap(candidate).value;
@@ -68,7 +67,14 @@ export function buildHighlightSegments(
     if (best) matches.push({ ...best, entity });
   }
 
-  matches.sort((a, b) => a.start - b.start || b.end - b.start - (a.end - a.start));
+  const statePriority = (entity: EntityRecord) =>
+    entity._review.deleted ? 0 : entity.status === "accepted" ? 2 : 1;
+  matches.sort(
+    (a, b) =>
+      a.start - b.start ||
+      statePriority(a.entity) - statePriority(b.entity) ||
+      b.end - b.start - (a.end - a.start),
+  );
   const accepted: typeof matches = [];
   let cursor = -1;
   for (const match of matches) {

@@ -1,5 +1,20 @@
 export type SaveState = "idle" | "saving" | "saved" | "error";
 export type ReviewTab = "entities" | "relationships";
+export type EntityListFilter = "pending" | "accepted";
+
+export interface EntityDraft {
+  name: string;
+  entity_type: string;
+  evidence_text: string;
+  scope: "current" | "all";
+}
+
+export interface RelationDraft {
+  start_entity_id: string;
+  relation_type: string;
+  end_entity_id: string;
+  evidence_text: string;
+}
 
 export interface ReviewMeta {
   operation: "source" | "create" | "update" | "delete";
