@@ -26,11 +26,23 @@ describe("buildHighlightSegments", () => {
     expect(segments.find((item) => item.entity)?.text).toBe("反复发作的口腔溃疡");
   });
 
-  it("does not highlight deleted entities", () => {
+  it("keeps rejected entities available for red-border highlighting", () => {
     const deleted = entity("口腔溃疡");
     deleted._review.deleted = true;
-    expect(buildHighlightSegments("口腔溃疡", [deleted])).toEqual([
-      { text: "口腔溃疡" },
-    ]);
+    const segments = buildHighlightSegments("口腔溃疡", [deleted]);
+
+    expect(segments[0].entity?._review.deleted).toBe(true);
+  });
+
+  it("prioritizes rejected entities when evidence spans overlap", () => {
+    const accepted = entity("口腔溃疡");
+    accepted.status = "accepted";
+    const rejected = entity("口腔溃疡");
+    rejected.entity_id = "E-rejected";
+    rejected._review.deleted = true;
+
+    const segments = buildHighlightSegments("口腔溃疡", [accepted, rejected]);
+
+    expect(segments[0].entity?.entity_id).toBe("E-rejected");
   });
 });

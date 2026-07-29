@@ -149,7 +149,12 @@ def finalize(body: MutationRequest):
 @router.get("/api/review/pdf/{document_id}")
 def get_pdf(document_id: str):
     path = repo().source_pdf(document_id)
-    return FileResponse(path, media_type="application/pdf", filename=path.name)
+    return FileResponse(
+        path,
+        media_type="application/pdf",
+        filename=path.name,
+        content_disposition_type="inline",
+    )
 
 
 @router.post("/api/review/import")

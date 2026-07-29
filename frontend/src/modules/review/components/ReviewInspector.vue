@@ -125,7 +125,7 @@ const emit = defineEmits<{
   display: flex;
   width: 430px;
   min-width: 0;
-  max-width: 620px;
+  max-width: 860px;
   flex: 0 0 auto;
   flex-direction: column;
   border-left: 1px solid var(--border);
@@ -308,13 +308,13 @@ const emit = defineEmits<{
 
 @media (max-width: 1279px) {
   .review-inspector {
-    width: 380px !important;
+    width: 520px !important;
   }
 }
 
 @media (max-width: 1100px) {
   .review-inspector {
-    width: 340px !important;
+    width: 400px !important;
   }
 
   .inspector-summary p {

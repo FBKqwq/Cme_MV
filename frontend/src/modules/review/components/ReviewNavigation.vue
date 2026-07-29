@@ -2,7 +2,6 @@
 import {
   AlertCircle,
   CheckCircle2,
-  ChevronDown,
   ChevronRight,
   Clock3,
   FileText,
@@ -24,7 +23,6 @@ const props = defineProps<{
   searchQuery: string;
   pendingOnly: boolean;
   collapsed: boolean;
-  documentPercent: number;
   statusLabel: (chunk: ChunkSummary) => string;
 }>();
 
@@ -38,78 +36,58 @@ const emit = defineEmits<{
 }>();
 
 const documentOptions = computed(() => {
-  const values = new Map<string, { total: number; approved: number }>();
+  const values = new Map<
+    string,
+    { total: number; approved: number; issues: number; modified: number }
+  >();
   for (const chunk of props.chunks) {
     const title = chunk._source_title || "未命名文档";
-    const stats = values.get(title) || { total: 0, approved: 0 };
+    const stats = values.get(title) || {
+      total: 0,
+      approved: 0,
+      issues: 0,
+      modified: 0,
+    };
     stats.total += 1;
     if (chunk.approved) stats.approved += 1;
+    stats.issues += chunk.issue_count;
+    if (chunk.has_changes) stats.modified += 1;
     values.set(title, stats);
   }
-  return Array.from(values, ([title, stats]) => ({ title, ...stats })).sort((a, b) =>
-    a.title.localeCompare(b.title, "zh-CN"),
+  const order = new Map(
+    (props.task?.documents ?? []).map((document, index) => [
+      document.title,
+      index,
+    ]),
+  );
+  return Array.from(values, ([title, stats]) => ({ title, ...stats })).sort(
+    (a, b) =>
+      (order.get(a.title) ?? Number.MAX_SAFE_INTEGER) -
+        (order.get(b.title) ?? Number.MAX_SAFE_INTEGER) ||
+      a.title.localeCompare(b.title, "zh-CN"),
   );
 });
 
-const currentDocument = computed(() =>
-  documentOptions.value.find((item) => item.title === props.selectedPdf),
+const currentDocumentTitle = computed(
+  () =>
+    props.selectedPdf ||
+    props.chunks.find((chunk) => chunk.chunk_id === props.activeChunkId)
+      ?._source_title ||
+    documentOptions.value[0]?.title ||
+    "",
+);
+
+const visibleChunks = computed(() =>
+  props.filteredChunks.filter(
+    (chunk) =>
+      (chunk._source_title || "未命名文档") === currentDocumentTitle.value,
+  ),
 );
 </script>
 
 <template>
   <aside class="chunk-sidebar" :class="{ collapsed }">
     <template v-if="!collapsed">
-      <div class="sidebar-overview">
-        <div class="overview-head">
-          <div>
-            <span class="eyebrow">复验进度</span>
-            <strong>{{ task?.progress.approved }}/{{ task?.progress.total }}</strong>
-          </div>
-          <button
-            class="icon-button subtle"
-            type="button"
-            aria-label="折叠 Chunk 导航"
-            @click="emit('update:collapsed', true)"
-          >
-            <PanelLeftClose :size="18" />
-          </button>
-        </div>
-        <div class="progress-track" aria-label="全篇复验进度">
-          <div class="progress-value" :style="{ width: `${documentPercent}%` }"></div>
-        </div>
-        <div class="overview-meta">
-          <span>{{ documentPercent }}% 已完成</span>
-          <span v-if="task?.progress.issues" class="issue-text">
-            <AlertCircle :size="13" />{{ task.progress.issues }} 项需处理
-          </span>
-          <span v-else><CheckCircle2 :size="13" />暂无阻塞</span>
-        </div>
-      </div>
-
-      <div class="document-picker">
-        <span class="eyebrow">文档范围</span>
-        <label class="document-select">
-          <FileText :size="15" />
-          <span>
-            <select
-              :value="selectedPdf"
-              aria-label="选择复验文档"
-              @change="emit('update:selectedPdf', ($event.target as HTMLSelectElement).value)"
-            >
-              <option value="">全部文档（{{ chunks.length }} 段）</option>
-              <option v-for="item in documentOptions" :key="item.title" :value="item.title">
-                {{ item.title.replace(/\u300a|\u300b/g, "") }}（{{ item.total }} 段）
-              </option>
-            </select>
-            <small v-if="currentDocument">
-              {{ currentDocument.approved }}/{{ currentDocument.total }} 已通过
-            </small>
-            <small v-else>{{ chunks.filter((item) => item.approved).length }}/{{ chunks.length }} 已通过</small>
-          </span>
-          <ChevronDown :size="15" />
-        </label>
-      </div>
-
       <div class="chunk-tools">
         <label class="search-field">
           <Search :size="15" />
@@ -124,23 +102,70 @@ const currentDocument = computed(() =>
           class="filter-toggle"
           :class="{ active: pendingOnly }"
           type="button"
+          :aria-label="pendingOnly ? '显示全部 Chunk' : '仅看待复验'"
           :aria-pressed="pendingOnly"
+          :title="pendingOnly ? '显示全部 Chunk' : '仅看待复验'"
           @click="emit('update:pendingOnly', !pendingOnly)"
         >
-          <Filter :size="14" />
-          仅看待复验
-          <span v-if="pendingOnly">{{ filteredChunks.length }}</span>
+          <Filter :size="16" />
+          <span v-if="pendingOnly" class="filter-count">{{ filteredChunks.length }}</span>
+        </button>
+        <button
+          class="toolbar-icon-button"
+          type="button"
+          aria-label="折叠 Chunk 导航"
+          title="折叠导航"
+          @click="emit('update:collapsed', true)"
+        >
+          <PanelLeftClose :size="17" />
         </button>
       </div>
 
-      <div class="chunk-list-heading">
+      <div class="navigation-section-heading">
+        <span>PDF 文档</span>
+        <strong>{{ documentOptions.length }}</strong>
+      </div>
+
+      <div class="document-list" aria-label="PDF 文档列表">
+        <button
+          v-for="document in documentOptions"
+          :key="document.title"
+          class="document-row"
+          :class="{ active: document.title === currentDocumentTitle }"
+          type="button"
+          @click="emit('update:selectedPdf', document.title)"
+        >
+          <span class="document-icon"><FileText :size="16" /></span>
+          <span class="document-row-content">
+            <span class="document-row-title">
+              {{ document.title.replace(/\u300a|\u300b/g, "") }}
+            </span>
+            <span class="document-row-meta">
+              {{ document.total }} Chunks
+              <span aria-hidden="true">·</span>
+              {{ document.approved }}/{{ document.total }} 已通过
+            </span>
+          </span>
+          <span v-if="document.issues" class="document-issue">
+            {{ document.issues }}
+          </span>
+          <CheckCircle2
+            v-else-if="document.approved === document.total"
+            :size="15"
+            class="document-complete"
+          />
+          <ChevronRight v-else :size="15" class="document-arrow" />
+        </button>
+      </div>
+
+      <div class="navigation-section-heading chunk-heading">
         <span>Chunk 列表</span>
-        <strong>{{ filteredChunks.length }}</strong>
+        <strong>{{ visibleChunks.length }}</strong>
       </div>
 
       <div class="chunk-list" aria-label="Chunk 列表">
         <button
-          v-for="chunk in filteredChunks"
+          v-for="chunk in visibleChunks"
           :key="chunk.chunk_id"
           class="chunk-row"
           :class="{
@@ -171,7 +196,7 @@ const currentDocument = computed(() =>
           <ChevronRight :size="15" class="chunk-arrow" />
         </button>
 
-        <div v-if="!filteredChunks.length" class="list-empty">
+        <div v-if="!visibleChunks.length" class="list-empty">
           <Filter :size="20" />
           <strong>没有符合条件的 Chunk</strong>
           <button type="button" @click="emit('clearFilters')">清除筛选</button>
@@ -197,7 +222,7 @@ const currentDocument = computed(() =>
   position: relative;
   z-index: 8;
   display: flex;
-  width: 284px;
+  width: 300px;
   min-width: 0;
   flex: 0 0 auto;
   flex-direction: column;
@@ -211,118 +236,13 @@ const currentDocument = computed(() =>
   width: 48px;
 }
 
-.sidebar-overview {
-  padding: 17px 15px 14px;
-  border-bottom: 1px solid var(--border);
-}
-
-.overview-head,
-.overview-head > div,
-.overview-meta {
-  display: flex;
-  align-items: center;
-}
-
-.overview-head {
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.overview-head > div {
-  align-items: baseline;
-  gap: 8px;
-}
-
-.overview-head strong {
-  color: #2e3850;
-  font-size: 18px;
-  font-variant-numeric: tabular-nums;
-}
-
-.progress-track {
-  height: 6px;
-  overflow: hidden;
-  border-radius: 99px;
-  background: #e8edf4;
-}
-
-.progress-value {
-  height: 100%;
-  border-radius: inherit;
-  background: var(--primary);
-  transition: width 350ms ease;
-}
-
-.overview-meta {
-  justify-content: space-between;
-  margin-top: 9px;
-  color: var(--text-faint);
-  font-size: 11px;
-}
-
-.overview-meta span {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.overview-meta .issue-text {
-  color: var(--amber);
-}
-
-.document-picker {
-  padding: 13px 12px 10px;
-  border-bottom: 1px solid rgba(225, 231, 240, 0.75);
-}
-
-.document-picker > .eyebrow {
-  display: block;
-  margin: 0 3px 7px;
-}
-
-.document-select {
-  display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) 16px;
-  align-items: center;
-  gap: 7px;
-  padding: 9px 9px;
-  color: var(--primary);
-  border: 1px solid #dce0f7;
-  border-radius: 11px;
-  background: #f7f7ff;
-}
-
-.document-select > span {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.document-select select {
-  width: 100%;
-  min-width: 0;
-  padding: 0 20px 0 0;
-  overflow: hidden;
-  color: #354057;
-  border: 0;
-  outline: 0;
-  appearance: none;
-  background: transparent;
-  font-size: 12px;
-  font-weight: 680;
-  text-overflow: ellipsis;
-}
-
-.document-select small {
-  color: var(--text-faint);
-  font-size: 10px;
-}
-
 .chunk-tools {
   display: grid;
-  gap: 8px;
-  padding: 11px 12px 9px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(225, 231, 240, 0.75);
 }
 
 .search-field {
@@ -354,18 +274,18 @@ const currentDocument = computed(() =>
 }
 
 .filter-toggle {
+  position: relative;
   display: flex;
-  width: fit-content;
+  width: 36px;
+  height: 36px;
   align-items: center;
-  gap: 6px;
-  padding: 5px 8px;
+  justify-content: center;
+  padding: 0;
   cursor: pointer;
   color: var(--text-faint);
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: transparent;
-  font-size: 11px;
-  font-weight: 600;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.8);
 }
 
 .filter-toggle:hover,
@@ -375,18 +295,46 @@ const currentDocument = computed(() =>
   background: var(--primary-soft);
 }
 
-.filter-toggle span {
-  padding: 1px 5px;
+.filter-toggle .filter-count {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 16px;
+  padding: 1px 4px;
+  color: #fff;
   border-radius: 99px;
-  background: #fff;
-  font-size: 9px;
+  background: var(--primary);
+  box-shadow: 0 0 0 2px #fafdff;
+  font-size: 8px;
+  font-weight: 750;
+  line-height: 14px;
+  text-align: center;
 }
 
-.chunk-list-heading {
+.toolbar-icon-button {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  cursor: pointer;
+  place-items: center;
+  color: var(--text-faint);
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+}
+
+.toolbar-icon-button:hover {
+  color: var(--primary);
+  border-color: #dce0fb;
+  background: var(--primary-soft);
+}
+
+.navigation-section-heading {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: space-between;
-  padding: 7px 14px 5px;
+  padding: 9px 13px 7px;
   color: var(--text-faint);
   font-size: 10px;
   font-weight: 700;
@@ -394,8 +342,115 @@ const currentDocument = computed(() =>
   text-transform: uppercase;
 }
 
-.chunk-list-heading strong {
+.navigation-section-heading strong {
   font-size: 10px;
+}
+
+.document-list {
+  max-height: 36%;
+  min-height: 112px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border-bottom: 1px solid var(--border);
+  scrollbar-color: #cfd7e4 transparent;
+  scrollbar-width: thin;
+}
+
+.document-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 20px;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 11px 10px 12px;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  border: 0;
+  border-bottom: 1px solid #edf0f5;
+  background: transparent;
+}
+
+.document-row:hover {
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.document-row.active {
+  background: #f0f2ff;
+}
+
+.document-row.active::before {
+  position: absolute;
+  inset: 8px auto 8px 0;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--primary);
+  content: "";
+}
+
+.document-icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  color: #78849a;
+  border: 1px solid #e3e7ef;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.document-row.active .document-icon {
+  color: var(--primary);
+  border-color: #d9ddfb;
+}
+
+.document-row-content {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.document-row-title {
+  overflow: hidden;
+  color: #354057;
+  font-size: 12px;
+  font-weight: 680;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.document-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-faint);
+  font-size: 10px;
+}
+
+.document-issue {
+  min-width: 19px;
+  padding: 2px 5px;
+  color: #b66a09;
+  border-radius: 99px;
+  background: #fff3d9;
+  font-size: 9px;
+  font-weight: 750;
+  text-align: center;
+}
+
+.document-complete {
+  color: var(--teal);
+}
+
+.document-arrow {
+  color: #a8b1c0;
+}
+
+.chunk-heading {
+  border-bottom: 1px solid rgba(225, 231, 240, 0.65);
 }
 
 .chunk-list {
@@ -568,14 +623,5 @@ const currentDocument = computed(() =>
     width: 220px;
   }
 
-  .sidebar-overview,
-  .document-picker {
-    padding-right: 10px;
-    padding-left: 10px;
-  }
-
-  .overview-meta {
-    font-size: 9px;
-  }
 }
 </style>

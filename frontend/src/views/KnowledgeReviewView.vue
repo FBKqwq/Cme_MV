@@ -12,7 +12,6 @@ import {
   onMounted,
   reactive,
   ref,
-  watch,
 } from "vue";
 import { useRouter } from "vue-router";
 import { ApiError, api, mutation } from "../modules/review/api";
@@ -61,7 +60,10 @@ const savingLabel = computed(() => {
   if (saveState.value === "error") return "保存失败";
   return "修改自动保存";
 });
-const inspectorWidth = ref(Number(localStorage.getItem("review-inspector-width")) || 430);
+const storedInspectorWidth = Number(localStorage.getItem("review-inspector-width"));
+const inspectorWidth = ref(
+  storedInspectorWidth ? Math.max(560, storedInspectorWidth) : 680,
+);
 const entityEditingId = ref("");
 const relationEditingId = ref("");
 const showAddEntity = ref(false);
@@ -75,6 +77,7 @@ const toast = reactive<{
   action?: () => Promise<void>;
 }>({ visible: false, message: "" });
 let toastTimer: number | undefined;
+let detailRequestId = 0;
 
 const entityDraft = reactive<EntityDraft>({
   name: "",
@@ -159,7 +162,6 @@ const entityTypeColors: Record<string, string> = {
   treatments: "#dcfce7",
   plans: "#cffafe",
 };
-const documentPercent = computed(() => task.value?.progress.percent ?? 0);
 const currentPage = computed(() => detail.value?.chunk.page_start ?? 1);
 
 function entityTypeLabel(value: string): string {
@@ -237,12 +239,15 @@ async function loadTaskAndChunks(selectInitial = false) {
 }
 
 async function loadChunk(chunkId: string) {
+  const requestId = ++detailRequestId;
   detailLoading.value = true;
   errorMessage.value = "";
   try {
-    detail.value = await api<ChunkDetail>(
+    const result = await api<ChunkDetail>(
       `/api/review/chunks/${encodeURIComponent(chunkId)}`,
     );
+    if (requestId !== detailRequestId) return;
+    detail.value = result;
     if (task.value) task.value.version = detail.value.version;
     selectedEntityId.value =
       detail.value.entities.find((item) => !item._review.deleted)?.entity_id || "";
@@ -254,9 +259,10 @@ async function loadChunk(chunkId: string) {
     showAddEntity.value = false;
     showAddRelation.value = false;
   } catch (error) {
+    if (requestId !== detailRequestId) return;
     errorMessage.value = errorText(error);
   } finally {
-    detailLoading.value = false;
+    if (requestId === detailRequestId) detailLoading.value = false;
   }
 }
 
@@ -266,14 +272,13 @@ function selectChunk(chunkId: string) {
     selectedPdf.value = chunk._source_title;
   }
   activeChunkId.value = chunkId;
+  void loadChunk(chunkId);
 }
 
 function selectPdf(sourceTitle: string) {
   selectedPdf.value = sourceTitle;
   const first = chunks.value.find((c) => c._source_title === sourceTitle);
-  if (first) {
-    activeChunkId.value = first.chunk_id;
-  }
+  if (first) selectChunk(first.chunk_id);
 }
 
 async function bootstrap() {
@@ -663,7 +668,7 @@ async function approveAndNext() {
       chunks.value.slice(current + 1).find((item) => !item.approved) ||
       chunks.value[current + 1];
     if (next) {
-      activeChunkId.value = next.chunk_id;
+      selectChunk(next.chunk_id);
     } else {
       await loadChunk(activeChunkId.value);
       showToast("当前已是最后一个 Chunk");
@@ -690,7 +695,7 @@ async function approveAndNext() {
 
 function goRelative(direction: -1 | 1) {
   const next = chunks.value[activeChunkIndex.value + direction];
-  if (next) activeChunkId.value = next.chunk_id;
+  if (next) selectChunk(next.chunk_id);
 }
 
 async function finalizeReview() {
@@ -774,8 +779,8 @@ function beginResize(event: PointerEvent) {
   const startWidth = inspectorWidth.value;
   const move = (moveEvent: PointerEvent) => {
     inspectorWidth.value = Math.min(
-      620,
-      Math.max(360, startWidth + startX - moveEvent.clientX),
+      860,
+      Math.max(560, startWidth + startX - moveEvent.clientX),
     );
   };
   const stop = () => {
@@ -801,10 +806,6 @@ function handleKeyboard(event: KeyboardEvent) {
     void approveAndNext();
   }
 }
-
-watch(activeChunkId, (chunkId) => {
-  if (chunkId) void loadChunk(chunkId);
-});
 
 onMounted(() => {
   window.addEventListener("keydown", handleKeyboard);
@@ -865,7 +866,6 @@ onBeforeUnmount(() => {
         :search-query="searchQuery"
         :pending-only="pendingOnly"
         :collapsed="leftCollapsed"
-        :document-percent="documentPercent"
         :status-label="statusLabel"
         @update:selected-pdf="selectPdf"
         @update:search-query="searchQuery = $event"
@@ -924,6 +924,7 @@ onBeforeUnmount(() => {
           :editing-id="entityEditingId"
           :show-add="showAddEntity"
           :draft="entityDraft"
+          :selected-evidence="selectedEvidence"
           :entity-type-colors="entityTypeColors"
           :entity-type-label="entityTypeLabel"
           @select="selectedEntityId = $event"

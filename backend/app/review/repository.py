@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import re
+import threading
 import uuid
 import zipfile
 from collections import defaultdict
@@ -97,6 +98,8 @@ class ReviewRepository:
         self._validate_source()
         self._sync_input_hash()
         self._load_or_initialize_results()
+        self._snapshot_lock = threading.RLock()
+        self._snapshot: dict[str, Any] | None = None
 
     def _manifest_path(self) -> Path:
         return self.inbox_root / "chunks"
@@ -488,6 +491,8 @@ class ReviewRepository:
 
     def _save_result(self, document_id: str) -> None:
         self._atomic_write_json(self._result_path(document_id), self.results[document_id])
+        if hasattr(self, "_snapshot"):
+            self._snapshot = None
 
     def _validate_source(self) -> None:
         issues: list[str] = []
@@ -717,10 +722,20 @@ class ReviewRepository:
                 deleted.add(canonical_id)
         return deleted
 
-    def _entity_options(self) -> list[dict[str, str]]:
+    def _entity_options(
+        self,
+        canonicals: Iterable[dict[str, Any]] | None = None,
+        entities: Iterable[dict[str, Any]] | None = None,
+    ) -> list[dict[str, str]]:
         options: list[dict[str, str]] = []
         seen: set[str] = set()
-        for canonical in self.projected_canonical_entities():
+        canonical_rows = (
+            canonicals
+            if canonicals is not None
+            else self.projected_canonical_entities()
+        )
+        entity_rows = entities if entities is not None else self.projected_entities()
+        for canonical in canonical_rows:
             entity_id = str(canonical.get("entity_id", ""))
             if not entity_id or canonical["_review"].get("deleted") or entity_id in seen:
                 continue
@@ -733,7 +748,7 @@ class ReviewRepository:
                     "canonical": "true",
                 }
             )
-        for entity in self.projected_entities():
+        for entity in entity_rows:
             review_id = entity.get("review_canonical_id")
             if not review_id or review_id in seen or entity["_review"].get("deleted"):
                 continue
@@ -749,9 +764,16 @@ class ReviewRepository:
         return options
 
     def _relation_conflicts(
-        self, relations: Iterable[dict[str, Any]]
+        self,
+        relations: Iterable[dict[str, Any]],
+        entity_options: Iterable[dict[str, str]] | None = None,
     ) -> dict[str, list[dict[str, str]]]:
-        options = {item["id"]: item for item in self._entity_options()}
+        option_rows = (
+            entity_options
+            if entity_options is not None
+            else self._entity_options()
+        )
+        options = {item["id"]: item for item in option_rows}
         changed_canonical_ids = self._changed_canonical_ids()
         deleted_canonical_ids = self._deleted_canonical_ids()
         result: dict[str, list[dict[str, str]]] = {}
@@ -815,6 +837,48 @@ class ReviewRepository:
             result[relation_id] = conflicts
         return result
 
+    def _review_snapshot(self) -> dict[str, Any]:
+        """Build immutable projections once per review version and index by chunk."""
+        current_version = self.version()
+        snapshot = self._snapshot
+        if snapshot is not None and snapshot["version"] == current_version:
+            return snapshot
+
+        with self._snapshot_lock:
+            snapshot = self._snapshot
+            if snapshot is not None and snapshot["version"] == current_version:
+                return snapshot
+
+            entities = self.projected_entities()
+            canonicals = self.projected_canonical_entities()
+            relationships = self.projected_relationships()
+            entity_options = self._entity_options(canonicals, entities)
+            conflicts = self._relation_conflicts(relationships, entity_options)
+
+            entities_by_chunk: dict[str, list[dict[str, Any]]] = defaultdict(list)
+            relationships_by_chunk: dict[str, list[dict[str, Any]]] = defaultdict(list)
+            for entity in entities:
+                entities_by_chunk[str(entity.get("chunk_id", ""))].append(entity)
+            for relationship in relationships:
+                for chunk_id in self._relation_chunk_ids(relationship):
+                    relationships_by_chunk[chunk_id].append(relationship)
+
+            override_chunks = {
+                row["chunk_id"]
+                for kind in ("entity", "relationship")
+                for row in self._overrides(kind).values()
+            }
+            snapshot = {
+                "version": current_version,
+                "entity_options": entity_options,
+                "conflicts": conflicts,
+                "entities_by_chunk": entities_by_chunk,
+                "relationships_by_chunk": relationships_by_chunk,
+                "override_chunks": override_chunks,
+            }
+            self._snapshot = snapshot
+            return snapshot
+
     def _chunk_review_rows(self) -> dict[str, dict[str, Any]]:
         rows: dict[str, dict[str, Any]] = {}
         for result in self.results.values():
@@ -822,19 +886,22 @@ class ReviewRepository:
         return rows
 
     def chunk_summaries(self, pending_only: bool = False) -> list[dict[str, Any]]:
-        entities_by_chunk: dict[str, int] = defaultdict(int)
-        for entity in self.projected_entities():
-            if not entity["_review"].get("deleted"):
-                entities_by_chunk[str(entity.get("chunk_id", ""))] += 1
-        relations = self.projected_relationships()
-        conflicts = self._relation_conflicts(relations)
+        snapshot = self._review_snapshot()
+        conflicts = snapshot["conflicts"]
+        entities_by_chunk: dict[str, int] = {
+            chunk_id: sum(
+                not entity["_review"].get("deleted")
+                for entity in entities
+            )
+            for chunk_id, entities in snapshot["entities_by_chunk"].items()
+        }
         relation_counts: dict[str, int] = defaultdict(int)
         issue_counts: dict[str, int] = defaultdict(int)
-        for relation in relations:
-            if relation["_review"].get("deleted"):
-                continue
-            relation_id = str(relation["relation_id"])
-            for chunk_id in self._relation_chunk_ids(relation):
+        for chunk_id, relations in snapshot["relationships_by_chunk"].items():
+            for relation in relations:
+                if relation["_review"].get("deleted"):
+                    continue
+                relation_id = str(relation["relation_id"])
                 relation_counts[chunk_id] += 1
                 issue_counts[chunk_id] += len(conflicts.get(relation_id, []))
         reviews = self._chunk_review_rows()
@@ -844,7 +911,7 @@ class ReviewRepository:
             review = reviews.get(chunk_id)
             has_override = bool(
                 review and review["has_changes"]
-            ) or self._chunk_has_override(chunk_id)
+            ) or chunk_id in snapshot["override_chunks"]
             status = review["status"] if review else "pending"
             if status == "approved" and has_override:
                 display_status = "modified"
@@ -858,7 +925,7 @@ class ReviewRepository:
                 "page_start": chunk.get("page_start"),
                 "page_end": chunk.get("page_end"),
                 "text_preview": str(chunk.get("text", ""))[:90],
-                "entity_count": entities_by_chunk[chunk_id],
+                "entity_count": entities_by_chunk.get(chunk_id, 0),
                 "relation_count": relation_counts[chunk_id],
                 "issue_count": issue_counts[chunk_id],
                 "status": display_status,
@@ -931,25 +998,24 @@ class ReviewRepository:
         chunk = self.chunk_by_id.get(chunk_id)
         if not chunk:
             raise HTTPException(status_code=404, detail="未找到该 chunk")
-        entities = [
-            item
-            for item in self.projected_entities()
-            if str(item.get("chunk_id")) == chunk_id
-        ]
+        snapshot = self._review_snapshot()
+        entities = deepcopy(snapshot["entities_by_chunk"].get(chunk_id, []))
         for entity in entities:
             entity["canonical_entity_id"] = entity.get(
                 "review_canonical_id"
             ) or self.raw_to_canonical.get(str(entity.get("entity_id")))
-        relations = [
-            item
-            for item in self.projected_relationships()
-            if chunk_id in self._relation_chunk_ids(item)
-        ]
-        conflicts = self._relation_conflicts(relations)
+        relations = deepcopy(snapshot["relationships_by_chunk"].get(chunk_id, []))
+        conflicts = {
+            str(relation["relation_id"]): snapshot["conflicts"].get(
+                str(relation["relation_id"]), []
+            )
+            for relation in relations
+        }
         for relation in relations:
-            relation["conflicts"] = conflicts.get(str(relation["relation_id"]), [])
+            relation["conflicts"] = deepcopy(
+                conflicts.get(str(relation["relation_id"]), [])
+            )
         review = self._chunk_review_rows().get(chunk_id)
-        options = self._entity_options()
         option_ids = {
             str(relation.get("start_entity_id"))
             for relation in relations
@@ -967,7 +1033,9 @@ class ReviewRepository:
             "entities": entities,
             "relationships": relations,
             "entity_options": [
-                option for option in options if option["id"] in option_ids
+                deepcopy(option)
+                for option in snapshot["entity_options"]
+                if option["id"] in option_ids
             ],
             "entity_types": self.entity_types,
             "relation_types": self.relation_types,
@@ -976,7 +1044,7 @@ class ReviewRepository:
                 "has_changes": bool(review["has_changes"]) if review else False,
                 "issue_count": sum(len(value) for value in conflicts.values()),
             },
-            "version": self.version(),
+            "version": snapshot["version"],
         }
 
     def _write_override(

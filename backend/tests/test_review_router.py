@@ -44,3 +44,4 @@ def test_review_health_is_ok_with_repository(monkeypatch, tmp_path) -> None:
     assert task.json()["documents"][0]["document_id"] == "TEST"
     assert pdf.status_code == 200
     assert pdf.headers["content-type"] == "application/pdf"
+    assert pdf.headers["content-disposition"].startswith("inline;")

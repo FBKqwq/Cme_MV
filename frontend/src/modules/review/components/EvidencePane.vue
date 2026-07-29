@@ -99,12 +99,6 @@ const emit = defineEmits<{
           </button>
         </div>
       </div>
-
-      <div class="evidence-context">
-        <span><Highlighter :size="14" />点击高亮可定位抽取结果</span>
-        <span>选中文字可快速新建实体</span>
-      </div>
-
       <article class="evidence-reader" @mouseup="emit('captureSelection', $event)">
         <p class="evidence-text">
           <template
@@ -119,13 +113,19 @@ const emit = defineEmits<{
                 {
                   active: selectedEntityId === segment.entity.entity_id,
                   modified: segment.entity._review.modified,
+                  accepted:
+                    !segment.entity._review.deleted &&
+                    segment.entity.status === 'accepted',
+                  rejected: segment.entity._review.deleted,
+                  review:
+                    !segment.entity._review.deleted &&
+                    segment.entity.status !== 'accepted',
                 },
               ]"
               type="button"
               @click.stop="emit('selectEntity', segment.entity)"
             >
               {{ segment.text }}
-              <span class="highlight-dot" aria-hidden="true"></span>
             </button>
             <span v-else>{{ segment.text }}</span>
           </template>
@@ -320,23 +320,27 @@ const emit = defineEmits<{
   margin: 0 auto;
   color: #303a4c;
   font-family: "Noto Serif SC", "Songti SC", SimSun, serif;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 420;
-  line-height: 2.04;
-  letter-spacing: 0.016em;
-  white-space: pre-wrap;
+  line-height: 1.78;
+  letter-spacing: 0.01em;
+  text-align: left;
+  white-space: normal;
   word-break: break-word;
 }
 
 .entity-highlight {
+  --highlight-border: #d97706;
   position: relative;
   display: inline;
-  margin: 0 1px;
-  padding: 2px;
+  margin: 0;
+  padding: 1px 2px;
   cursor: pointer;
   color: inherit;
+  border: 0;
   border-radius: 4px;
   background: rgba(105, 116, 226, 0.13);
+  box-shadow: inset 0 0 0 1px var(--highlight-border);
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
   font-family: inherit;
@@ -345,11 +349,25 @@ const emit = defineEmits<{
   text-align: left;
 }
 
+.entity-highlight.accepted {
+  --highlight-border: #202633;
+}
+
+.entity-highlight.rejected {
+  --highlight-border: #dc2626;
+}
+
+.entity-highlight.review {
+  --highlight-border: #d97706;
+}
+
 .entity-highlight:hover,
 .entity-highlight.active {
   color: #2734a7;
   background: rgba(89, 100, 223, 0.2);
-  box-shadow: 0 0 0 2px rgba(89, 100, 223, 0.13);
+  box-shadow:
+    inset 0 0 0 1px var(--highlight-border),
+    0 0 0 2px rgba(89, 100, 223, 0.13);
 }
 
 .entity-highlight.modified,
@@ -370,15 +388,6 @@ const emit = defineEmits<{
 .entity-highlight.type-etiologies,
 .entity-highlight.type-pathogeneses {
   background: rgba(156, 98, 190, 0.14);
-}
-
-.highlight-dot {
-  display: inline-block;
-  width: 4px;
-  height: 4px;
-  margin: 0 1px 2px 2px;
-  border-radius: 99px;
-  background: var(--primary);
 }
 
 .selection-action {
@@ -488,7 +497,7 @@ const emit = defineEmits<{
 
   .evidence-text {
     font-size: 15px;
-    line-height: 1.92;
+    line-height: 1.72;
   }
 }
 

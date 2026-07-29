@@ -44,8 +44,29 @@ const emit = defineEmits<{
     </div>
 
     <div v-if="task" class="document-heading">
-      <span class="document-title">{{ task.document.title }}</span>
-      <span class="contract-badge">Graph Contract V{{ task.document.schema_version }}</span>
+      <div class="document-heading-main">
+        <span class="document-title">{{ task.document.title }}</span>
+        <span class="contract-badge">Graph Contract V{{ task.document.schema_version }}</span>
+      </div>
+      <div class="header-progress" aria-label="全篇复验进度">
+        <span class="header-progress-label">
+          复验进度
+          <strong>{{ task.progress.approved }}/{{ task.progress.total }}</strong>
+        </span>
+        <span class="header-progress-track">
+          <span
+            class="header-progress-value"
+            :style="{ width: `${task.progress.percent}%` }"
+          ></span>
+        </span>
+        <span class="header-progress-percent">{{ task.progress.percent }}%</span>
+        <span v-if="task.progress.issues" class="header-progress-issues">
+          <AlertCircle :size="12" />{{ task.progress.issues }} 项需处理
+        </span>
+        <span v-else class="header-progress-clear">
+          <CheckCircle2 :size="12" />暂无阻塞
+        </span>
+      </div>
     </div>
 
     <div class="topbar-actions">
@@ -105,7 +126,11 @@ const emit = defineEmits<{
 
 .brand-block,
 .topbar-actions,
-.document-heading,
+.document-heading-main,
+.header-progress,
+.header-progress-label,
+.header-progress-issues,
+.header-progress-clear,
 .save-indicator {
   display: flex;
   align-items: center;
@@ -160,10 +185,18 @@ const emit = defineEmits<{
 }
 
 .document-heading {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 18px;
+}
+
+.document-heading-main {
   min-width: 0;
   justify-content: center;
   gap: 10px;
-  padding: 0 18px;
 }
 
 .document-title {
@@ -185,6 +218,60 @@ const emit = defineEmits<{
   background: #f5f6ff;
   font-size: 10px;
   font-weight: 700;
+}
+
+.header-progress {
+  width: min(100%, 520px);
+  justify-content: center;
+  gap: 8px;
+  color: var(--text-faint);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.header-progress-label {
+  gap: 5px;
+}
+
+.header-progress-label strong {
+  color: #344057;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.header-progress-track {
+  position: relative;
+  width: clamp(78px, 14vw, 180px);
+  height: 5px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: #e4e9f1;
+}
+
+.header-progress-value {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: var(--primary);
+  transition: width 350ms ease;
+}
+
+.header-progress-percent {
+  min-width: 27px;
+  font-variant-numeric: tabular-nums;
+}
+
+.header-progress-issues,
+.header-progress-clear {
+  gap: 3px;
+}
+
+.header-progress-issues {
+  color: var(--amber);
+}
+
+.header-progress-clear {
+  color: var(--teal);
 }
 
 .topbar-actions {
@@ -290,6 +377,8 @@ const emit = defineEmits<{
   }
 
   .contract-badge,
+  .header-progress-issues,
+  .header-progress-clear,
   .utility-menu summary span {
     display: none;
   }

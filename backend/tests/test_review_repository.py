@@ -239,3 +239,60 @@ def test_pdf_mapping_is_document_scoped(tmp_path: Path) -> None:
 def test_import_rejects_unknown_entity_chunk(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="未知 chunk"):
         make_task(tmp_path, invalid_chunk=True)
+
+
+def test_review_snapshot_is_reused_and_invalidated(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = make_task(tmp_path)
+    calls = {"entities": 0, "canonicals": 0, "relationships": 0}
+
+    for name, key in (
+        ("projected_entities", "entities"),
+        ("projected_canonical_entities", "canonicals"),
+        ("projected_relationships", "relationships"),
+    ):
+        original = getattr(repository, name)
+
+        def counted(original=original, key=key):
+            calls[key] += 1
+            return original()
+
+        monkeypatch.setattr(repository, name, counted)
+
+    repository.chunk_summaries()
+    repository.chunk_detail("TEST_CH01")
+    repository.chunk_detail("TEST_CH01")
+
+    assert calls == {"entities": 1, "canonicals": 1, "relationships": 1}
+
+    approved = repository.approve_chunk("TEST_CH01", base_version=0)
+    detail = repository.chunk_detail("TEST_CH01")
+
+    assert approved["version"] == 1
+    assert detail["version"] == 1
+    assert detail["review"]["status"] == "approved"
+    assert calls == {"entities": 2, "canonicals": 2, "relationships": 2}
+
+
+def test_chunk_summary_keeps_chunks_without_entities(tmp_path: Path) -> None:
+    repository = make_task(tmp_path)
+    empty_chunk = {
+        "chunk_id": "TEST_CH02",
+        "section_title": "空章节",
+        "text": "",
+        "_doc_id": "TEST",
+        "_source_title": "测试共识",
+    }
+    repository.chunks.append(empty_chunk)
+    repository.chunk_by_id["TEST_CH02"] = empty_chunk
+
+    summary = next(
+        item
+        for item in repository.chunk_summaries()
+        if item["chunk_id"] == "TEST_CH02"
+    )
+
+    assert summary["entity_count"] == 0
+    assert summary["relation_count"] == 0
