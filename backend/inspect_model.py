@@ -10,7 +10,7 @@ import sklearn
 MODEL_PATH = (
     Path(__file__).resolve().parent
     / "models"
-    / "诊断结果四分类模型.joblib"
+    / "diagnosis_classifier.joblib"
 )
 
 

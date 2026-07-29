@@ -45,3 +45,8 @@ data/review/current/raw_pdf/*
 data/review/current/graph_property_schema_v3_6.json
 data/review/state/*
 !data/review/state/.gitkeep
+
+# Trained models and generated model versions
+backend/models/*.joblib
+backend/models/backups/
+backend/models/versions/

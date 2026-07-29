@@ -23,6 +23,12 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.database import engine
+from app.model_deployer import (
+    deploy_candidate,
+    evaluate_package_on_dataset,
+    evaluate_promotion,
+    rollback_to_backup,
+)
 from app.model_service import model_service
 from app.models import Annotation, ModelVersion, TrainingJob
 from app.training_dataset_service import build_training_dataset
@@ -195,19 +201,24 @@ def _validate_dataset(
     if unknown_labels:
         raise ValueError(f"发现模型不认识的诊断类别：{unknown_labels}")
 
+    # 分层测试集每类至少需要留 1 条，训练集还要至少 2 条做交叉验证。
+    effective_minimum_per_class = max(
+        3,
+        settings.auto_training_minimum_samples_per_class,
+    )
+
     counts = Counter(target.astype(str).tolist())
     insufficient = {
         label: counts.get(label, 0)
         for label in class_labels
-        if counts.get(label, 0)
-        < settings.auto_training_minimum_samples_per_class
+        if counts.get(label, 0) < effective_minimum_per_class
     }
 
     if insufficient:
         raise ValueError(
             "以下类别样本不足："
-            f"{insufficient}；每类至少需要 "
-            f"{settings.auto_training_minimum_samples_per_class} 条。"
+            f"{insufficient}；当前训练流程每类至少需要 "
+            f"{effective_minimum_per_class} 条。"
         )
 
     if features.empty:
@@ -218,29 +229,37 @@ def _train_candidate(
     features: pd.DataFrame,
     target: pd.Series,
     class_labels: list[str],
-) -> tuple[dict[str, Any], dict[str, float], str]:
+) -> tuple[
+    dict[str, Any],
+    dict[str, float],
+    str,
+    pd.DataFrame,
+    pd.Series,
+]:
     features = features.replace([np.inf, -np.inf], np.nan).copy()
     target = target.astype(str).copy()
 
+    # 为了保证新旧模型输入接口完全一致，不删除常量字段。
     constant_columns = [
         column
         for column in features.columns
         if features[column].nunique(dropna=False) <= 1
     ]
-    if constant_columns:
-        features = features.drop(columns=constant_columns)
-
-    if features.empty:
-        raise ValueError("删除常量字段后没有可用于训练的特征。")
 
     preprocessor, numeric_features, categorical_features = (
         _build_preprocessor(features)
     )
 
+    # 验证集至少要包含每个类别 1 条记录。
+    validation_size = max(
+        len(class_labels),
+        int(np.ceil(len(target) * TEST_SIZE)),
+    )
+
     X_train, X_test, y_train, y_test = train_test_split(
         features,
         target,
-        test_size=TEST_SIZE,
+        test_size=validation_size,
         stratify=target,
         random_state=RANDOM_STATE,
     )
@@ -294,7 +313,12 @@ def _train_candidate(
 
     metrics = {
         "macro_f1": float(
-            f1_score(y_test, predicted_labels, average="macro")
+            f1_score(
+                y_test,
+                predicted_labels,
+                average="macro",
+                zero_division=0,
+            )
         ),
         "balanced_accuracy": float(
             balanced_accuracy_score(y_test, predicted_labels)
@@ -320,7 +344,8 @@ def _train_candidate(
         "categorical_features": categorical_features,
         "class_labels": class_labels,
         "model_classes": [str(item) for item in final_model.classes_.tolist()],
-        "excluded_columns": constant_columns,
+        "constant_columns": constant_columns,
+        "excluded_columns": [],
         "best_model_name": best_name,
         "best_params": best_search.best_params_,
         "test_metrics": metrics,
@@ -332,9 +357,10 @@ def _train_candidate(
         "created_at": datetime.now().isoformat(timespec="seconds"),
         "sample_count": int(len(features)),
         "data_source": "confirmed_doctor_annotations",
+        "training_source": "confirmed_doctor_annotations",
     }
 
-    return package, metrics, best_name
+    return package, metrics, best_name, X_test, y_test
 
 
 def _verify_candidate(
@@ -371,18 +397,37 @@ def _verify_candidate(
     if not np.all(np.isfinite(probabilities)):
         raise RuntimeError("候选模型概率包含无效数值。")
 
+    probability_sum = float(probabilities[0].sum())
+    if not np.isclose(probability_sum, 1.0, atol=1e-5):
+        raise RuntimeError("候选模型概率之和不等于 1。")
+
     return package
+
+
+def _mark_annotations_included(
+    db: Session,
+    annotation_ids: list[int],
+    version: str,
+) -> None:
+    annotations = db.scalars(
+        select(Annotation).where(Annotation.id.in_(annotation_ids))
+    ).all()
+
+    for annotation in annotations:
+        annotation.training_status = "included"
+        annotation.trained_model_version = version
 
 
 def execute_training_job(job_id: int) -> None:
     """
     执行一个 queued 训练任务。
 
-    该函数供 FastAPI BackgroundTasks 调用，因此内部必须创建独立数据库会话。
-    第一版只生成 candidate，不替换正式模型。
+    训练完成后先生成不可变候选模型；如果自动部署开关已开启，
+    会在同一验证集上比较新旧模型，通过门槛后自动替换正式模型。
     """
 
-    annotation_ids: list[int] = []
+    deployment_backup_path: Path | None = None
+    deployment_sample: dict[str, Any] | None = None
 
     try:
         with Session(engine) as db:
@@ -398,8 +443,8 @@ def execute_training_job(job_id: int) -> None:
             if model_service.package is None:
                 model_service.load()
 
+            current_package = dict(model_service.package or {})
             feature_columns = list(model_service.feature_columns)
-            current_package = model_service.package or {}
             class_labels = [
                 str(item)
                 for item in current_package.get(
@@ -413,7 +458,13 @@ def execute_training_job(job_id: int) -> None:
 
             _validate_dataset(dataset.features, dataset.target, class_labels)
 
-            package, metrics, best_model_name = _train_candidate(
+            (
+                package,
+                candidate_metrics,
+                best_model_name,
+                validation_features,
+                validation_target,
+            ) = _train_candidate(
                 dataset.features,
                 dataset.target,
                 class_labels,
@@ -431,14 +482,27 @@ def execute_training_job(job_id: int) -> None:
                 temporary_path.unlink()
 
             joblib.dump(package, temporary_path, compress=3)
-            _verify_candidate(temporary_path, dataset.features)
+            verified_package = _verify_candidate(
+                temporary_path,
+                dataset.features,
+            )
             temporary_path.replace(candidate_path)
 
-            parent_version = None
-            if current_package:
-                parent_version = str(
-                    current_package.get("package_version", "unknown")
-                )
+            current_metrics = evaluate_package_on_dataset(
+                current_package,
+                validation_features,
+                validation_target,
+            )
+            decision = evaluate_promotion(
+                candidate_package=verified_package,
+                current_package=current_package,
+                candidate_metrics=candidate_metrics,
+                current_metrics=current_metrics,
+            )
+
+            parent_version = str(
+                current_package.get("package_version", "unknown")
+            )
 
             model_version = ModelVersion(
                 version=version,
@@ -446,19 +510,60 @@ def execute_training_job(job_id: int) -> None:
                 file_path=str(candidate_path),
                 status="candidate",
                 sample_count=len(dataset.target),
-                macro_f1=metrics["macro_f1"],
-                balanced_accuracy=metrics["balanced_accuracy"],
-                log_loss=metrics["log_loss"],
+                macro_f1=candidate_metrics["macro_f1"],
+                balanced_accuracy=candidate_metrics["balanced_accuracy"],
+                log_loss=candidate_metrics["log_loss"],
                 parent_version=parent_version,
             )
             db.add(model_version)
+            db.flush()
 
-            annotations = db.scalars(
-                select(Annotation).where(Annotation.id.in_(annotation_ids))
-            ).all()
-            for annotation in annotations:
-                annotation.training_status = "included"
-                annotation.trained_model_version = version
+            _mark_annotations_included(
+                db,
+                annotation_ids,
+                version,
+            )
+
+            deployment_message = ""
+
+            if settings.auto_model_deployment_enabled:
+                if decision.approved:
+                    deployment_sample = (
+                        dataset.features.iloc[0].to_dict()
+                    )
+                    deployment_result = deploy_candidate(
+                        candidate_path,
+                        deployment_sample,
+                    )
+                    deployment_backup_path = deployment_result.backup_path
+
+                    production_versions = db.scalars(
+                        select(ModelVersion).where(
+                            ModelVersion.status == "production",
+                            ModelVersion.id != model_version.id,
+                        )
+                    ).all()
+                    for old_version in production_versions:
+                        old_version.status = "archived"
+
+                    model_version.status = "production"
+                    model_version.deployed_at = _utc_now()
+                    model_version.failure_reason = None
+
+                    deployment_message = (
+                        "；自动部署成功，"
+                        f"备份={deployment_result.backup_path.name}"
+                    )
+                else:
+                    rejection_reason = "；".join(decision.reasons)
+                    model_version.status = "rejected"
+                    model_version.failure_reason = rejection_reason[:1000]
+                    deployment_message = (
+                        "；候选模型未通过自动部署门槛："
+                        f"{rejection_reason}"
+                    )
+            else:
+                deployment_message = "；自动部署开关未开启，保留为候选模型"
 
             job.status = "succeeded"
             job.candidate_version = version
@@ -467,9 +572,32 @@ def execute_training_job(job_id: int) -> None:
                 "候选模型训练完成；"
                 f"模型={best_model_name}，"
                 f"样本数={len(dataset.target)}，"
-                f"Macro-F1={metrics['macro_f1']:.4f}"
+                f"候选Macro-F1={candidate_metrics['macro_f1']:.4f}，"
+                f"当前Macro-F1={current_metrics['macro_f1']:.4f}"
+                f"{deployment_message}"
+            )[:1000]
+
+            try:
+                db.commit()
+            except Exception:
+                db.rollback()
+
+                if (
+                    deployment_backup_path is not None
+                    and deployment_sample is not None
+                ):
+                    rollback_to_backup(
+                        deployment_backup_path,
+                        deployment_sample,
+                    )
+
+                raise
+
+            print(
+                f"训练任务 {job_id} 完成："
+                f"candidate={version}，"
+                f"model_status={model_version.status}"
             )
-            db.commit()
 
     except ValueError as exc:
         with Session(engine) as db:
@@ -480,12 +608,21 @@ def execute_training_job(job_id: int) -> None:
                 job.message = str(exc)[:1000]
                 db.commit()
 
+        print(f"训练任务 {job_id} 被拒绝：{exc}")
+
     except Exception as exc:
         with Session(engine) as db:
             job = db.get(TrainingJob, job_id)
             if job is not None:
                 job.status = "failed"
                 job.finished_at = _utc_now()
-                job.message = f"训练失败：{type(exc).__name__}: {exc}"[:1000]
+                job.message = (
+                    f"训练或自动部署失败："
+                    f"{type(exc).__name__}: {exc}"
+                )[:1000]
                 db.commit()
-        raise
+
+        print(
+            f"训练任务 {job_id} 失败："
+            f"{type(exc).__name__}: {exc}"
+        )

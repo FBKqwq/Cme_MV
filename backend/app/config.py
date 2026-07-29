@@ -21,38 +21,72 @@ class Settings(BaseSettings):
         / "review"
     )
 
-    # 自动训练是否启用
+    # ------------------------------
+    # 自动训练
+    # ------------------------------
     auto_training_enabled: bool = True
 
-    # 每新增多少条未参与训练的医生标注后触发训练
-    auto_training_annotation_threshold: int = 1
+    # 每新增多少条未参与训练的医生标注后触发训练。
+    auto_training_annotation_threshold: int = 20
 
-    # 至少需要多少条有效标注数据才允许训练
-    auto_training_minimum_sample_count: int = 5
+    # 至少需要多少条有效标注数据才允许训练。
+    auto_training_minimum_sample_count: int = 20
 
-    # 每个诊断类别至少需要多少条样本
-    auto_training_minimum_samples_per_class: int = 1
+    # 每个诊断类别至少需要多少条样本。
+    # 自动训练当前使用分层测试集和至少 2 折交叉验证，
+    # 因此程序内部还会强制每类至少 3 条。
+    auto_training_minimum_samples_per_class: int = 5
 
-    # 新模型的 Macro-F1 允许比当前模型低多少
-    # 第一版建议不允许降低
+    # 保留旧配置名，兼容已有 .env。
     auto_training_macro_f1_tolerance: float = 0.0
 
-    # 项目目录
+    # ------------------------------
+    # 自动模型部署
+    # ------------------------------
+    # 默认关闭。确认测试通过后，在 .env 中显式设置为 true。
+    auto_model_deployment_enabled: bool = False
+
+    # 候选模型允许比当前正式模型低多少。
+    # 0 表示不允许降低。
+    auto_model_deployment_macro_f1_tolerance: float = 0.0
+    auto_model_deployment_balanced_accuracy_tolerance: float = 0.0
+
+    # Log Loss 越小越好；该值表示候选模型最多允许高出多少。
+    auto_model_deployment_log_loss_tolerance: float = 0.0
+
+    # 绝对最低指标门槛。
+    auto_model_deployment_minimum_macro_f1: float = 0.0
+    auto_model_deployment_minimum_balanced_accuracy: float = 0.0
+
+    # 自动部署时要求类别和输入字段与当前模型完全一致。
+    auto_model_deployment_require_same_classes: bool = True
+    auto_model_deployment_require_same_feature_columns: bool = True
+
+    # 保留最近多少个正式模型备份。
+    auto_model_backup_count: int = 5
+
+    # ------------------------------
+    # 项目路径
+    # ------------------------------
     backend_dir: Path = Path(__file__).resolve().parent.parent
     project_root: Path = backend_dir.parent
 
-    # 正式模型路径
     model_path: Path = (
         backend_dir
         / "models"
         / "diagnosis_classifier.joblib"
     )
 
-    # 自动训练产生的模型版本目录
     model_versions_dir: Path = (
         backend_dir
         / "models"
         / "versions"
+    )
+
+    model_backups_dir: Path = (
+        backend_dir
+        / "models"
+        / "backups"
     )
 
     model_config = SettingsConfigDict(
