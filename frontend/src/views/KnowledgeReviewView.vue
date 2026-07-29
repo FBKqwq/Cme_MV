@@ -913,6 +913,7 @@ onBeforeUnmount(() => {
         @open-pdf="pdfOpen = true"
         @relative="goRelative"
         @select-entity="selectHighlightedEntity"
+        @clear-entity-selection="selectedEntityId = ''"
         @capture-selection="captureSelection"
         @create-from-selection="openCreateEntity()"
         @approve-next="approveAndNext"

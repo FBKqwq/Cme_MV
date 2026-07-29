@@ -31,6 +31,7 @@ const emit = defineEmits<{
   openPdf: [];
   relative: [offset: -1 | 1];
   selectEntity: [entity: EntityRecord];
+  clearEntitySelection: [];
   captureSelection: [event: MouseEvent];
   createFromSelection: [];
   approveNext: [];
@@ -98,7 +99,12 @@ const emit = defineEmits<{
           </button>
         </div>
       </div>
-      <article class="evidence-reader" @mouseup="emit('captureSelection', $event)">
+      <article
+        class="evidence-reader"
+        :class="{ 'has-entity-selection': selectedEntityId }"
+        @click="emit('clearEntitySelection')"
+        @mouseup="emit('captureSelection', $event)"
+      >
         <p class="evidence-text">
           <template
             v-for="(segment, index) in highlightedSegments"
@@ -336,19 +342,25 @@ const emit = defineEmits<{
   position: relative;
   display: inline;
   margin: 0;
-  padding: 1px 2px;
+  padding: 1px 3px;
   cursor: pointer;
   color: inherit;
   border: 0;
   border-radius: 4px;
-  background: rgba(105, 116, 226, 0.13);
-  box-shadow: inset 0 0 0 1px var(--highlight-border);
+  background: rgba(105, 116, 226, 0.12);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--highlight-border) 58%, transparent),
+    inset 0 -1px 0 var(--highlight-border);
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
   font-family: inherit;
   font-size: inherit;
   line-height: inherit;
   text-align: left;
+  transition:
+    color 120ms ease,
+    background-color 120ms ease,
+    box-shadow 120ms ease;
 }
 
 .entity-highlight.accepted {
@@ -358,7 +370,7 @@ const emit = defineEmits<{
 .entity-highlight.rejected {
   --highlight-border: #dc2626;
   color: #b91c1c;
-  background: rgba(220, 38, 38, 0.1);
+  background: rgba(220, 38, 38, 0.12);
   text-decoration: line-through;
   text-decoration-color: #dc2626;
   text-decoration-thickness: 1.5px;
@@ -366,21 +378,6 @@ const emit = defineEmits<{
 
 .entity-highlight.review {
   --highlight-border: #d97706;
-}
-
-.entity-highlight:hover,
-.entity-highlight.active {
-  color: #2734a7;
-  background: rgba(89, 100, 223, 0.2);
-  box-shadow:
-    inset 0 0 0 1px var(--highlight-border),
-    0 0 0 2px rgba(89, 100, 223, 0.13);
-}
-
-.entity-highlight.rejected:hover,
-.entity-highlight.rejected.active {
-  color: #b91c1c;
-  background: rgba(220, 38, 38, 0.15);
 }
 
 .entity-highlight.modified,
@@ -395,12 +392,55 @@ const emit = defineEmits<{
 }
 
 .entity-highlight.type-tests {
-  background: rgba(181, 121, 38, 0.14);
+  background: rgba(181, 121, 38, 0.15);
 }
 
 .entity-highlight.type-etiologies,
 .entity-highlight.type-pathogeneses {
-  background: rgba(156, 98, 190, 0.14);
+  background: rgba(156, 98, 190, 0.13);
+}
+
+.evidence-reader.has-entity-selection
+  .entity-highlight:not(.active):not(.rejected) {
+  background: rgba(100, 116, 139, 0.07);
+  box-shadow: inset 0 -1px 0 rgba(100, 116, 139, 0.38);
+}
+
+.entity-highlight:hover {
+  color: #2734a7;
+  background: rgba(89, 100, 223, 0.2);
+  box-shadow:
+    inset 0 0 0 1px var(--highlight-border),
+    inset 0 -2px 0 var(--highlight-border),
+    0 0 0 2px rgba(89, 100, 223, 0.12);
+}
+
+.entity-highlight.active {
+  color: #1f2ca5;
+  background: rgba(89, 100, 223, 0.34);
+  box-shadow:
+    inset 0 0 0 1px var(--highlight-border),
+    inset 0 -2px 0 var(--highlight-border),
+    0 0 0 3px rgba(89, 100, 223, 0.2);
+}
+
+.entity-highlight:focus-visible {
+  outline: 2px solid #4f5bd5;
+  outline-offset: 2px;
+}
+
+.entity-highlight.rejected:hover {
+  color: #b91c1c;
+  background: rgba(220, 38, 38, 0.2);
+}
+
+.entity-highlight.rejected.active {
+  color: #b91c1c;
+  background: rgba(220, 38, 38, 0.28);
+  box-shadow:
+    inset 0 0 0 1px var(--highlight-border),
+    inset 0 -2px 0 var(--highlight-border),
+    0 0 0 3px rgba(220, 38, 38, 0.16);
 }
 
 .selection-action {
