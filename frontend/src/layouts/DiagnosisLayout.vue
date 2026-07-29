@@ -49,7 +49,7 @@ const activeMenu = computed(() => route.path)
       </el-menu>
     </el-aside>
 
-    <el-container>
+    <el-container class="content-container">
       <el-header class="header">
         <div>
           <div class="header-title">
@@ -74,18 +74,38 @@ const activeMenu = computed(() => route.path)
 </template>
 
 <style scoped>
+:global(html),
+:global(body),
+:global(#app) {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
 .app-container {
-  min-height: 100vh;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .sidebar {
-  min-height: 100vh;
+  height: 100vh;
+  flex-shrink: 0;
+  overflow-y: auto;
   background: #17365d;
+}
+
+.content-container {
+  height: 100vh;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .logo {
   height: 80px;
   padding: 18px 22px;
+  box-sizing: border-box;
   color: #ffffff;
   border-bottom: 1px solid rgb(255 255 255 / 12%);
 }
@@ -116,10 +136,12 @@ const activeMenu = computed(() => route.path)
 
 .header {
   height: 80px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 28px;
+  box-sizing: border-box;
   background: #ffffff;
   border-bottom: 1px solid #e4e7ed;
 }
@@ -141,7 +163,13 @@ const activeMenu = computed(() => route.path)
 }
 
 .main-content {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
   padding: 24px;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: auto;
   background: #f4f6f9;
 }
 </style>
