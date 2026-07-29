@@ -1,4 +1,4 @@
-export type SaveState = "idle" | "saving" | "saved" | "error";
+export type SaveState = "idle" | "dirty" | "saving" | "saved" | "error";
 export type ReviewTab = "entities" | "relationships";
 export type EntityListFilter = "pending" | "accepted";
 
@@ -110,6 +110,14 @@ export interface EntityRecord {
   document_core_disease?: string;
   metadata?: Record<string, unknown>;
   _review: ReviewMeta;
+}
+
+export interface ChunkEntitySnapshot {
+  entity_id: string;
+  name: string;
+  entity_type: string;
+  evidence_text: string;
+  rejected: boolean;
 }
 
 export interface Conflict {

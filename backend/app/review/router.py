@@ -5,6 +5,7 @@ from fastapi.responses import FileResponse
 
 from .models import (
     ApproveRequest,
+    ChunkEntitySave,
     EntityCreate,
     EntityUpdate,
     MutationRequest,
@@ -73,6 +74,11 @@ def get_chunks(pending_only: bool = Query(default=False)):
 @router.get("/api/review/chunks/{chunk_id}")
 def get_chunk(chunk_id: str):
     return repo().chunk_detail(chunk_id)
+
+
+@router.put("/api/review/chunks/{chunk_id}/entities")
+def save_chunk_entities(chunk_id: str, body: ChunkEntitySave):
+    return repo().save_chunk_entities(chunk_id, body.model_dump())
 
 
 @router.post("/api/review/entities", status_code=201)

@@ -26,8 +26,10 @@ const pending: EntityRecord = {
   ...accepted,
   entity_id: "ENTITY_PENDING",
   name: "待复验实体",
+  entity_type: "",
   evidence_text: "待复验证据",
   status: "pending",
+  _review: { ...review },
 };
 
 const rejected: EntityRecord = {
@@ -35,8 +37,8 @@ const rejected: EntityRecord = {
   entity_id: "ENTITY_REJECTED",
   name: "已拒绝实体",
   evidence_text: "已拒绝证据",
-  status: "pending",
-  _review: { ...review, deleted: true },
+  status: "rejected",
+  _review: { ...review },
 };
 
 const detail = {
@@ -63,19 +65,21 @@ function createWrapper(options?: {
   editingId?: string;
   showAdd?: boolean;
   selectedEvidence?: string;
+  acceptedEntities?: EntityRecord[];
+  pendingEntities?: EntityRecord[];
 }) {
   return mount(EntityReviewPanel, {
     props: {
       detail,
-      pendingEntities: [rejected, pending],
-      acceptedEntities: [accepted],
+      pendingEntities: options?.pendingEntities ?? [rejected, pending],
+      acceptedEntities: options?.acceptedEntities ?? [accepted],
       selectedEntityId: "",
       editingId: options?.editingId ?? "",
       showAdd: options?.showAdd ?? false,
       draft,
       selectedEvidence: options?.selectedEvidence ?? "",
       entityTypeColors: { diseases: "#fee2e2" },
-      entityTypeLabel: () => "疾病",
+      entityTypeLabel: (value: string) => value ? "疾病" : "类型待定",
     },
   });
 }
@@ -88,15 +92,65 @@ describe("EntityReviewPanel", () => {
     expect(wrapper.get(".accepted-lane").text()).toContain("已接受实体");
     expect(wrapper.get(".decision-lane").text()).toContain("已拒绝实体");
     expect(wrapper.get(".decision-lane").text()).toContain("待复验实体");
+    expect(wrapper.get(".decision-lane").text()).toContain("类型待定");
   });
 
   it("orders rejected entities before review entities", () => {
-    const cards = createWrapper()
-      .findAll(".decision-lane .entity-card")
-      .map((card) => card.text());
+    const cardElements = createWrapper().findAll(
+      ".decision-lane .entity-card",
+    );
+    const cards = cardElements.map((card) => card.text());
 
     expect(cards[0]).toContain("已拒绝实体");
     expect(cards[1]).toContain("待复验实体");
+    expect(cardElements[0].classes()).toContain("state-rejected");
+  });
+
+  it("keeps source accepted entities visible with reject as the only decision", async () => {
+    const wrapper = createWrapper();
+    const sourceCard = wrapper
+      .findAll(".accepted-lane .entity-card")
+      .find((card) => card.text().includes("已接受实体"));
+
+    expect(sourceCard).toBeDefined();
+    expect(sourceCard?.classes()).toContain("state-accepted");
+    expect(sourceCard?.text()).toContain("拒绝");
+    expect(sourceCard?.text()).not.toContain("确认接受");
+    expect(sourceCard?.text()).not.toContain("转回复验");
+    expect(sourceCard?.findAll(".text-action")).toHaveLength(1);
+
+    await sourceCard!.get(".text-action").trigger("click");
+    expect(wrapper.emitted("reject")?.[0]).toEqual([accepted]);
+    expect(wrapper.emitted("approve")).toBeUndefined();
+    expect(wrapper.emitted("unapprove")).toBeUndefined();
+  });
+
+  it("keeps a human-rejected accepted entity in the accepted lane", () => {
+    const humanRejected = {
+      ...accepted,
+      _review: { ...review, deleted: true },
+    };
+    const wrapper = createWrapper({ acceptedEntities: [humanRejected] });
+
+    expect(wrapper.get(".accepted-lane").text()).toContain("已接受实体");
+    expect(wrapper.get(".decision-lane").text()).not.toContain("已接受实体");
+    expect(wrapper.get(".accepted-lane .entity-card").classes()).toContain(
+      "state-rejected",
+    );
+    expect(wrapper.get(".accepted-lane .entity-card").text()).toContain(
+      "撤销拒绝",
+    );
+  });
+
+  it("shows the full colored entity type only once", () => {
+    const sourceCard = createWrapper().get(".accepted-lane .entity-card");
+
+    expect(sourceCard.find(".entity-type-badge").exists()).toBe(false);
+    expect(sourceCard.findAll(".entity-type")).toHaveLength(1);
+    expect(sourceCard.get(".entity-type").text()).toBe("疾病");
+    expect(sourceCard.get(".entity-type").attributes("style")).toContain(
+      "background: rgb(254, 226, 226)",
+    );
   });
 
   it("supports selection evidence and keyboard save in the fixed editor", async () => {

@@ -106,6 +106,17 @@ class ReviewRepository:
 
     def _resolve_manifest_file(self, key: str, *, required: bool = True) -> Path | None:
         return None
+
+    @staticmethod
+    def _entity_source_stem(path: Path) -> str:
+        for suffix in (
+            ".entity_label_result.jsonl",
+            ".entity_nodes.base.jsonl",
+        ):
+            if path.name.endswith(suffix):
+                return path.name[: -len(suffix)]
+        return path.stem
+
     def _load_source(self) -> None:
         chunks_dir = self.inbox_root / "chunks"
         nodes_dir = self.inbox_root / "entity_nodes"
@@ -166,8 +177,10 @@ class ReviewRepository:
                 if doc_id and clean:
                     stem_to_doc[clean] = doc_id
 
-            for ef in sorted(nodes_dir.glob("*.entity_nodes.base.jsonl")):
-                raw_stem = ef.stem.replace(".entity_nodes.base", "")
+            entity_files_by_doc: dict[str, Path] = {}
+
+            def _match_document(ef: Path) -> str:
+                raw_stem = self._entity_source_stem(ef)
                 clean_ef = _clean_stem(raw_stem)
                 matched_doc = None
                 for clean, did in stem_to_doc.items():
@@ -176,9 +189,32 @@ class ReviewRepository:
                         break
                 if not matched_doc:
                     matched_doc = list(self.chunk_sources.keys())[0]
+                return matched_doc
 
+            # Base files remain a compatibility fallback. Complete label results
+            # override them per document so review/rejected rows are not dropped.
+            for ef in sorted(nodes_dir.glob("*.entity_nodes.base.jsonl")):
+                matched_doc = _match_document(ef)
+                entity_files_by_doc.setdefault(matched_doc, ef)
+            for ef in sorted(nodes_dir.glob("*.entity_label_result.jsonl")):
+                matched_doc = _match_document(ef)
+                entity_files_by_doc[matched_doc] = ef
+
+            self.entity_source_paths = sorted(
+                entity_files_by_doc.values(),
+                key=lambda path: path.name,
+            )
+            for ef in self.entity_source_paths:
+                matched_doc = _match_document(ef)
                 for rec in read_jsonl(ef):
                     rec["_doc_id"] = matched_doc
+                    if not rec.get("entity_type"):
+                        rec["entity_type"] = (
+                            rec.get("proposed_entity_type")
+                            or rec.get("fusion_entity_type")
+                            or rec.get("teacher_candidate_type")
+                            or ""
+                        )
                     cid = str(rec.get("chunk_id", ""))
                     if cid:
                         prefixed = f"{matched_doc}_{cid}"
@@ -255,9 +291,6 @@ class ReviewRepository:
             for k, v in self.relation_definitions.items()
         ]
 
-        # Derive synthetic relationships from entity co-occurrence per chunk.
-        self._derive_relationships()
-
     @staticmethod
     def _normalized_document_name(value: str) -> str:
         ignored = "《》（）()_-. "
@@ -290,105 +323,6 @@ class ReviewRepository:
                 )
             else:
                 source["pdf_available"] = False
-
-    def _derive_relationships(self) -> None:
-        """Derive synthetic relationships from entity type pairs per chunk."""
-        if self.relationships:
-            return  # already have explicit relationships
-        if not self.entities:
-            return
-
-        # Map schema contract labels to actual entity_type values
-        schema_to_type = {v.lower(): k for k, v in self.entity_contract_labels.items()}
-        # Build reverse map: entity_type -> schema contract_label
-        type_to_schema = self.entity_contract_labels  # already maps type_value -> contract_label
-
-        # Collect entities by chunk
-        by_chunk: dict[tuple[str, str], list[dict]] = {}
-        for e in self.entities:
-            cid = str(e.get("chunk_id", ""))
-            group_key = (str(e.get("_doc_id", "")), cid)
-            if group_key not in by_chunk:
-                by_chunk[group_key] = []
-            by_chunk[group_key].append(e)
-
-        relationships: list[dict] = []
-        seen_pairs: set[tuple[str, str, str]] = set()  # (rel_type, src_id, tgt_id)
-
-        for (document_id, cid), chunk_ents in by_chunk.items():
-            if not chunk_ents:
-                continue
-            # Group by entity_type
-            by_type: dict[str, list[dict]] = {}
-            for e in chunk_ents:
-                et = e.get("entity_type", "")
-                if et not in by_type:
-                    by_type[et] = []
-                by_type[et].append(e)
-
-            # Extended type pairs for cases without sub_diseases intermediary
-            extended_pairs = {
-                ("diseases", "sub_diseases"): "has_sub_disease",
-                ("diseases", "symptoms"): "manifests_as",
-                ("diseases", "tests"): "requires_test",
-                ("diseases", "treatments"): "follows_treatment",
-                ("diseases", "pathogeneses"): "explained_by",
-                ("sub_diseases", "symptoms"): "manifests_as",
-                ("sub_diseases", "tests"): "requires_test",
-                ("sub_diseases", "treatments"): "follows_treatment",
-                ("sub_diseases", "pathogeneses"): "explained_by",
-                ("treatments", "plans"): "implements_by",
-                ("sub_diseases", "methods"): "implements_by",
-                ("etiologies", "sub_diseases"): "causes",
-                ("etiologies", "pathogeneses"): "causes",
-                ("etiologies", "symptoms"): "causes",
-                ("pathogeneses", "symptoms"): "explained_by",
-            }
-
-            # Use extended pairs (direct type pairs + schema pairs)
-            all_pairs = list(extended_pairs.items())
-
-            for (src_type_val, tgt_type_val), rel_type in all_pairs:
-                if src_type_val not in by_type or tgt_type_val not in by_type:
-                    continue
-
-                # Pair source entities with target entities
-                src_ents = by_type[src_type_val]
-                tgt_ents = by_type[tgt_type_val]
-
-                for src in src_ents:
-                    for tgt in tgt_ents:
-                        if src["entity_id"] == tgt["entity_id"]:
-                            continue
-                        key = (rel_type, str(src["entity_id"]), str(tgt["entity_id"]))
-                        if key in seen_pairs:
-                            continue
-                        seen_pairs.add(key)
-
-                        rel_id = f"SYNTH_REL_{uuid.uuid4().hex[:12].upper()}"
-                        relationships.append({
-                            "relation_id": rel_id,
-                            "_doc_id": document_id,
-                            "chunk_id": cid,
-                            "source_chunk_id": cid,
-                            "target_chunk_id": cid,
-                            "start_entity_id": str(src["entity_id"]),
-                            "relation_type": rel_type,
-                            "end_entity_id": str(tgt["entity_id"]),
-                            "evidence_text": tgt.get("evidence_text", src.get("evidence_text", "")),
-                            "status": "pending",
-                            "source": "synthetic_derived",
-                            "conflicts": [],
-                            "_review": {
-                                "operation": "source",
-                                "deleted": False,
-                                "added": False,
-                                "modified": False,
-                            },
-                        })
-
-        self.relationships = relationships
-        self.relationship_by_id = {str(r["relation_id"]): r for r in relationships}
 
     @staticmethod
     def _safe_result_name(value: str) -> str:
@@ -460,30 +394,81 @@ class ReviewRepository:
             "audit_events": [],
         }
 
+    @staticmethod
+    def _merge_review_records(
+        fresh_records: list[dict[str, Any]],
+        previous_records: list[dict[str, Any]],
+        *,
+        id_field: str,
+    ) -> list[dict[str, Any]]:
+        previous_by_id = {
+            str(record.get(id_field, "")): record
+            for record in previous_records
+            if record.get(id_field)
+        }
+        merged: list[dict[str, Any]] = []
+        source_ids: set[str] = set()
+        review_fields = {
+            "review_flag",
+            "review_operation",
+            "review_scope",
+            "corrected_values",
+            "review_version",
+            "review_updated_at",
+            "restore_metadata",
+        }
+
+        for fresh in fresh_records:
+            record_id = str(fresh.get(id_field, ""))
+            source_ids.add(record_id)
+            previous = previous_by_id.get(record_id)
+            if previous and previous.get("review_operation") != "source":
+                for field in review_fields:
+                    if field in previous:
+                        fresh[field] = deepcopy(previous[field])
+            merged.append(fresh)
+
+        for previous in previous_records:
+            record_id = str(previous.get(id_field, ""))
+            if (
+                record_id
+                and record_id not in source_ids
+                and previous.get("review_operation") == "create"
+            ):
+                merged.append(deepcopy(previous))
+        return merged
+
+    def _rebase_document_result(
+        self,
+        document_id: str,
+        previous: dict[str, Any],
+    ) -> dict[str, Any]:
+        fresh = self._new_document_result(document_id)
+        fresh["entities"] = self._merge_review_records(
+            fresh["entities"],
+            previous.get("entities", []),
+            id_field="entity_id",
+        )
+        fresh["relationships"] = self._merge_review_records(
+            fresh["relationships"],
+            previous.get("relationships", []),
+            id_field="relation_id",
+        )
+        fresh["version"] = int(previous.get("version", 0))
+        fresh["updated_at"] = previous.get("updated_at")
+        fresh["chunk_reviews"] = deepcopy(previous.get("chunk_reviews", {}))
+        fresh["audit_events"] = deepcopy(previous.get("audit_events", []))
+        return fresh
+
     def _load_or_initialize_results(self) -> None:
         self.results: dict[str, dict[str, Any]] = {}
         for document_id in self.chunk_sources:
             path = self._result_path(document_id)
             if path.exists():
-                result = read_json(path)
-                if result.get("input_hash") != self.input_hash:
-                    changed = (
-                        any(
-                            entity.get("review_operation") != "source"
-                            for entity in result.get("entities", [])
-                        )
-                        or any(
-                            relation.get("review_operation") != "source"
-                            for relation in result.get("relationships", [])
-                        )
-                        or bool(result.get("chunk_reviews"))
-                    )
-                    if changed:
-                        raise ValueError(
-                            f"源文件已变化，但 {path.name} 中仍有旧修订。"
-                            "请先备份或迁移结果集。"
-                        )
-                    result = self._new_document_result(document_id)
+                result = self._rebase_document_result(
+                    document_id,
+                    read_json(path),
+                )
             else:
                 result = self._new_document_result(document_id)
             self.results[document_id] = result
@@ -531,7 +516,7 @@ class ReviewRepository:
                 checksums[f"chunks/{cf.name}"] = file_sha256(cf)
             nodes_dir = self.inbox_root / "entity_nodes"
             if nodes_dir.exists():
-                for ef in sorted(nodes_dir.glob("*.entity_nodes.base.jsonl")):
+                for ef in getattr(self, "entity_source_paths", []):
                     checksums[f"entity_nodes/{ef.name}"] = file_sha256(ef)
         checksums[self.schema_path.name] = file_sha256(self.schema_path)
         current_hash = hashlib.sha256(
@@ -1045,6 +1030,228 @@ class ReviewRepository:
                 "issue_count": sum(len(value) for value in conflicts.values()),
             },
             "version": snapshot["version"],
+        }
+
+    def save_chunk_entities(
+        self,
+        chunk_id: str,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Atomically persist the final entity draft for one chunk."""
+        self._assert_version(payload["base_version"])
+        if chunk_id not in self.chunk_by_id:
+            raise HTTPException(status_code=404, detail="未找到该 chunk")
+
+        current = {
+            str(entity["entity_id"]): entity
+            for entity in self.projected_entities()
+            if str(entity.get("chunk_id", "")) == chunk_id
+        }
+        snapshots = payload.get("entities", [])
+        submitted_ids = [str(item.get("entity_id", "")) for item in snapshots]
+        if len(set(submitted_ids)) != len(submitted_ids):
+            raise HTTPException(status_code=422, detail="实体快照包含重复 entity_id")
+        if set(submitted_ids) != set(current):
+            raise HTTPException(
+                status_code=422,
+                detail="实体快照与当前 Chunk 不一致，请刷新后重试",
+            )
+
+        prepared: list[dict[str, Any]] = []
+        editable_fields = ("name", "entity_type", "evidence_text")
+        for snapshot in snapshots:
+            entity_id = str(snapshot["entity_id"])
+            existing = current[entity_id]
+            entity_type = str(snapshot.get("entity_type", ""))
+            evidence_span = existing.get("evidence_span") or {}
+            existing_values = {
+                "name": existing.get("name", ""),
+                "entity_type": existing.get("entity_type", ""),
+                "evidence_text": (
+                    existing.get("evidence_text")
+                    or evidence_span.get("normalized_text")
+                    or evidence_span.get("raw_text")
+                    or existing.get("name", "")
+                ),
+            }
+            patch = {
+                field: snapshot.get(field, "")
+                for field in editable_fields
+                if snapshot.get(field, "") != existing_values[field]
+            }
+            if (
+                "entity_type" in patch
+                and entity_type not in self.entity_contract_labels
+            ):
+                raise HTTPException(status_code=422, detail="实体类型不在 V3.6 契约中")
+            rejected = bool(snapshot.get("rejected"))
+            currently_rejected = bool(existing["_review"].get("deleted"))
+            if patch or rejected != currently_rejected:
+                prepared.append(
+                    {
+                        "entity_id": entity_id,
+                        "existing": existing,
+                        "patch": patch,
+                        "rejected": rejected,
+                    }
+                )
+
+        if not prepared:
+            return {
+                "chunk_id": chunk_id,
+                "changed": 0,
+                "version": self.version(),
+            }
+
+        document_id = self._document_id_for_chunk(chunk_id)
+        result = deepcopy(self.results[document_id])
+        records = {
+            str(record.get("entity_id", "")): record
+            for record in result["entities"]
+        }
+        timestamp = utc_now()
+        version = self.version() + 1
+        sequence = sum(
+            len(item.get("audit_events", []))
+            for item in self.results.values()
+        )
+
+        for change in prepared:
+            entity_id = change["entity_id"]
+            existing = change["existing"]
+            patch = deepcopy(change["patch"])
+            rejected = change["rejected"]
+            record = records[entity_id]
+            previous_operation = str(record.get("review_operation") or "source")
+
+            if previous_operation == "delete":
+                restore_metadata = record.pop("restore_metadata", {})
+                underlying_operation = str(
+                    restore_metadata.get("operation") or "source"
+                )
+                underlying_scope = str(
+                    restore_metadata.get("scope") or "current"
+                )
+            else:
+                underlying_operation = previous_operation
+                underlying_scope = str(record.get("review_scope") or "current")
+
+            if patch:
+                if {"name", "entity_type"} & patch.keys():
+                    patch["review_canonical_id"] = existing.get(
+                        "review_canonical_id"
+                    ) or f"REVIEW_CANON_{uuid.uuid4().hex[:12].upper()}"
+                record.setdefault("corrected_values", {}).update(patch)
+                if underlying_operation != "create":
+                    underlying_operation = "update"
+                    underlying_scope = "current"
+
+            if rejected:
+                if underlying_operation != "source":
+                    record["restore_metadata"] = {
+                        "operation": underlying_operation,
+                        "scope": underlying_scope,
+                    }
+                else:
+                    record.pop("restore_metadata", None)
+                record["review_operation"] = "delete"
+                record["review_flag"] = "deleted"
+                action = "delete"
+            else:
+                record.pop("restore_metadata", None)
+                record["review_operation"] = underlying_operation
+                record["review_scope"] = underlying_scope
+                if underlying_operation == "create":
+                    record["review_flag"] = "added"
+                elif underlying_operation == "update":
+                    record["review_flag"] = "modified"
+                else:
+                    record["review_flag"] = "pending"
+                    if not patch:
+                        record["corrected_values"] = {}
+                action = (
+                    "restore"
+                    if bool(existing["_review"].get("deleted"))
+                    else "update"
+                )
+
+            record.update(
+                {
+                    "review_scope": "current",
+                    "review_version": version,
+                    "review_updated_at": timestamp,
+                }
+            )
+
+            canonical_id = (
+                patch.get("review_canonical_id")
+                or record.get("corrected_values", {}).get("review_canonical_id")
+            )
+            if canonical_id and not rejected:
+                projected = deepcopy(existing)
+                projected.update(record.get("corrected_values", {}))
+                canonical = {
+                    "entity_id": canonical_id,
+                    "entity_type": projected["entity_type"],
+                    "name": projected["name"],
+                    "raw_entity_ids": [entity_id],
+                    "source_chunk_ids": [chunk_id],
+                    "status": "review_added",
+                    "chunk_id": chunk_id,
+                    "review_flag": "added",
+                    "review_operation": "create",
+                    "review_scope": "current",
+                    "corrected_values": {},
+                    "review_version": version,
+                    "review_updated_at": timestamp,
+                }
+                result["canonical_entities"] = [
+                    item
+                    for item in result["canonical_entities"]
+                    if str(item.get("entity_id")) != canonical_id
+                ]
+                result["canonical_entities"].append(canonical)
+
+            sequence += 1
+            result["audit_events"].append(
+                {
+                    "sequence": sequence,
+                    "kind": "entity",
+                    "record_id": entity_id,
+                    "chunk_id": chunk_id,
+                    "action": action,
+                    "before": deepcopy(existing),
+                    "after": {
+                        **patch,
+                        "rejected": rejected,
+                    },
+                    "version": version,
+                    "created_at": timestamp,
+                }
+            )
+
+        result["chunk_reviews"][chunk_id] = {
+            "chunk_id": chunk_id,
+            "status": "pending",
+            "has_changes": True,
+            "version": version,
+            "updated_at": timestamp,
+        }
+        result["version"] = version
+        result["updated_at"] = timestamp
+        previous_result = self.results[document_id]
+        previous_snapshot = self._snapshot
+        self.results[document_id] = result
+        try:
+            self._save_result(document_id)
+        except Exception:
+            self.results[document_id] = previous_result
+            self._snapshot = previous_snapshot
+            raise
+        return {
+            "chunk_id": chunk_id,
+            "changed": len(prepared),
+            "version": version,
         }
 
     def _write_override(

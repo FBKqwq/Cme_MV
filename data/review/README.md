@@ -35,7 +35,11 @@ data/review/
 }
 ```
 
-`entity_nodes` 中的文件名必须以 `.entity_nodes.base.jsonl` 结尾。每行是一个 JSON 对象，至少包含 `entity_id`、`chunk_id`、`entity_type`、`name` 和 `evidence_text`。`chunk_id` 使用对应文档中的原始分块 ID，服务加载时会自动加上 `doc_id` 前缀。
+`entity_nodes` 优先读取以 `.entity_label_result.jsonl` 结尾的完整分类结果，
+以保留 `accepted`、`review` 和 `rejected` 状态。同一文档没有完整结果时，
+回退读取 `.entity_nodes.base.jsonl`。每行是一个 JSON 对象，至少包含
+`entity_id`、`chunk_id`、`entity_type`、`name` 和 `evidence_text`。
+`chunk_id` 使用对应文档中的原始分块 ID，服务加载时会自动加上 `doc_id` 前缀。
 
 `graph_property_schema_v3_6.json` 必须包含 `schema_version`、`entities` 和 `relationships` 定义。
 
