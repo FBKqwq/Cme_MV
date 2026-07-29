@@ -24,6 +24,19 @@ class EntityUpdate(BaseModel):
     status: Literal["pending", "accepted"] | None = None
 
 
+class ChunkEntitySnapshot(BaseModel):
+    entity_id: str = Field(min_length=1)
+    name: str = Field(min_length=1, max_length=200)
+    entity_type: str
+    evidence_text: str = ""
+    rejected: bool = False
+
+
+class ChunkEntitySave(BaseModel):
+    base_version: int
+    entities: list[ChunkEntitySnapshot]
+
+
 class RelationCreate(BaseModel):
     base_version: int
     chunk_id: str

@@ -32,8 +32,6 @@ const emit = defineEmits<{
   edit: [entity: EntityRecord];
   cancelEdit: [];
   save: [entity: EntityRecord];
-  approve: [entity: EntityRecord];
-  unapprove: [entity: EntityRecord];
   reject: [entity: EntityRecord];
   restore: [entity: EntityRecord];
   create: [];
@@ -43,10 +41,14 @@ const emit = defineEmits<{
 
 const nameInput = ref<HTMLInputElement | null>(null);
 const rejectedEntities = computed(() =>
-  props.pendingEntities.filter((entity) => entity._review.deleted),
+  props.pendingEntities.filter(
+    (entity) => entity._review.deleted || entity.status === "rejected",
+  ),
 );
 const reviewEntities = computed(() =>
-  props.pendingEntities.filter((entity) => !entity._review.deleted),
+  props.pendingEntities.filter(
+    (entity) => !entity._review.deleted && entity.status !== "rejected",
+  ),
 );
 const decisionEntities = computed(() => [
   ...rejectedEntities.value,
@@ -62,7 +64,7 @@ const lanes = computed(() => [
   {
     key: "accepted",
     title: "接受",
-    description: "已确认可进入知识库",
+    description: "输入结果为接受，仍需人工复验",
     entities: props.acceptedEntities,
   },
   {
@@ -84,6 +86,9 @@ watch(
 );
 
 function evidence(entity: EntityRecord): string {
+  if (entity._review.modified && entity.evidence_text) {
+    return entity.evidence_text;
+  }
   return (
     entity.evidence_span?.normalized_text ||
     entity.evidence_span?.raw_text ||
@@ -93,7 +98,7 @@ function evidence(entity: EntityRecord): string {
 }
 
 function reviewState(entity: EntityRecord): "accepted" | "rejected" | "review" {
-  if (entity._review.deleted) return "rejected";
+  if (entity._review.deleted || entity.status === "rejected") return "rejected";
   return entity.status === "accepted" ? "accepted" : "review";
 }
 
@@ -314,25 +319,44 @@ function handleEditorKeydown(event: KeyboardEvent) {
             @click="emit('select', entity.entity_id)"
           >
             <div class="entity-card-head">
-              <span
-                class="entity-type-badge"
-                :style="{ background: entityTypeColors[entity.entity_type] || '#eef0ff' }"
-              >
-                {{ entityTypeLabel(entity.entity_type).slice(0, 2) }}
-              </span>
               <div class="entity-primary">
                 <div class="entity-name-row">
                   <strong>{{ entity.name }}</strong>
-                  <span class="entity-type">{{ entityTypeLabel(entity.entity_type) }}</span>
-                </div>
-                <div class="record-status">
-                  <XCircle v-if="reviewState(entity) === 'rejected'" :size="12" />
-                  <CheckCircle2 v-else-if="reviewState(entity) === 'accepted'" :size="12" />
-                  <Clock3 v-else :size="12" />
-                  {{ stateLabel(entity) }}
-                  <span v-if="entity.confidence != null">
-                    · {{ Math.round(entity.confidence * 100) }}%
+                  <span
+                    class="entity-type"
+                    :style="{
+                      background: entityTypeColors[entity.entity_type] || '#eef0ff',
+                    }"
+                  >
+                    {{ entityTypeLabel(entity.entity_type) }}
                   </span>
+                </div>
+                <div class="entity-meta-row">
+                  <div class="record-status">
+                    <XCircle v-if="reviewState(entity) === 'rejected'" :size="12" />
+                    <CheckCircle2 v-else-if="reviewState(entity) === 'accepted'" :size="12" />
+                    <Clock3 v-else :size="12" />
+                    {{ stateLabel(entity) }}
+                    <span v-if="entity.confidence != null">
+                      · {{ Math.round(entity.confidence * 100) }}%
+                    </span>
+                  </div>
+                  <button
+                    v-if="entity._review.deleted"
+                    class="text-action restore"
+                    type="button"
+                    @click.stop="emit('restore', entity)"
+                  >
+                    <Redo2 :size="12" />撤销拒绝
+                  </button>
+                  <button
+                    v-else
+                    class="text-action danger"
+                    type="button"
+                    @click.stop="emit('reject', entity)"
+                  >
+                    <XCircle :size="12" />拒绝
+                  </button>
                 </div>
               </div>
               <button
@@ -353,48 +377,12 @@ function handleEditorKeydown(event: KeyboardEvent) {
                 [{{ entity.evidence_span.start }}-{{ entity.evidence_span.end }}]
               </small>
             </blockquote>
-
-            <footer class="card-actions">
-              <button
-                v-if="entity._review.deleted"
-                class="text-action restore"
-                type="button"
-                @click.stop="emit('restore', entity)"
-              >
-                <Redo2 :size="13" />恢复
-              </button>
-              <template v-else-if="entity.status === 'accepted'">
-                <button
-                  class="text-action"
-                  type="button"
-                  @click.stop="emit('unapprove', entity)"
-                >
-                  <Redo2 :size="13" />转回复验
-                </button>
-              </template>
-              <template v-else>
-                <button
-                  class="text-action danger"
-                  type="button"
-                  @click.stop="emit('reject', entity)"
-                >
-                  <XCircle :size="13" />拒绝
-                </button>
-                <button
-                  class="text-action accept"
-                  type="button"
-                  @click.stop="emit('approve', entity)"
-                >
-                  <Check :size="13" />接受
-                </button>
-              </template>
-            </footer>
           </article>
 
           <div v-if="!lane.entities.length" class="lane-empty">
             <CheckCircle2 v-if="lane.key === 'accepted'" :size="20" />
             <Clock3 v-else :size="20" />
-            <span>{{ lane.key === "accepted" ? "暂无接受实体" : "暂无拒绝或复验实体" }}</span>
+            <span>{{ lane.key === "accepted" ? "暂无接受类型实体" : "暂无拒绝或复验实体" }}</span>
           </div>
         </div>
       </section>
@@ -427,8 +415,8 @@ function handleEditorKeydown(event: KeyboardEvent) {
 .editor-actions,
 .entity-card-head,
 .entity-name-row,
+.entity-meta-row,
 .record-status,
-.card-actions,
 .lane-head > div {
   display: flex;
   align-items: center;
@@ -643,7 +631,7 @@ function handleEditorKeydown(event: KeyboardEvent) {
 
 .entity-card {
   --state-color: var(--amber);
-  margin-bottom: 7px;
+  margin-bottom: 6px;
   overflow: hidden;
   cursor: pointer;
   border: 1px solid #dce2eb;
@@ -666,22 +654,8 @@ function handleEditorKeydown(event: KeyboardEvent) {
 }
 
 .entity-card-head {
-  gap: 8px;
-  padding: 9px 9px 6px;
-}
-
-.entity-type-badge {
-  display: flex;
-  width: 27px;
-  height: 27px;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  color: rgba(25, 34, 52, 0.68);
-  border: 1px solid rgba(40, 54, 82, 0.07);
-  border-radius: 7px;
-  font-size: 9px;
-  font-weight: 760;
+  gap: 6px;
+  padding: 7px 8px 4px;
 }
 
 .entity-primary {
@@ -705,16 +679,23 @@ function handleEditorKeydown(event: KeyboardEvent) {
 .entity-type {
   flex: 0 0 auto;
   padding: 2px 5px;
-  color: var(--primary);
+  color: rgba(25, 34, 52, 0.72);
+  border: 1px solid rgba(40, 54, 82, 0.07);
   border-radius: 99px;
-  background: var(--primary-soft);
   font-size: 8px;
-  font-weight: 650;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.entity-meta-row {
+  min-width: 0;
+  min-height: 20px;
+  justify-content: space-between;
+  gap: 5px;
 }
 
 .record-status {
   gap: 3px;
-  margin-top: 3px;
   color: var(--state-color);
   font-size: 8px;
   font-weight: 650;
@@ -740,14 +721,14 @@ function handleEditorKeydown(event: KeyboardEvent) {
 .evidence-quote {
   display: flex;
   gap: 6px;
-  margin: 0 8px 7px 44px;
-  padding: 6px 7px;
+  margin: 0 8px 6px;
+  padding: 4px 6px;
   color: var(--text-soft);
   border-left: 2px solid #d9dfee;
   border-radius: 0 6px 6px 0;
   background: #f7f9fc;
   font-size: 9px;
-  line-height: 1.5;
+  line-height: 1.4;
 }
 
 .evidence-quote span {
@@ -765,21 +746,12 @@ function handleEditorKeydown(event: KeyboardEvent) {
   font-size: 7px;
 }
 
-.card-actions {
-  min-height: 31px;
-  justify-content: flex-end;
-  gap: 4px;
-  padding: 4px 7px;
-  border-top: 1px solid rgba(225, 231, 240, 0.72);
-  background: #fbfcfe;
-}
-
 .text-action {
   display: flex;
-  min-height: 23px;
+  min-height: 20px;
   align-items: center;
   gap: 3px;
-  padding: 0 6px;
+  padding: 0 4px;
   cursor: pointer;
   color: var(--text-soft);
   border-radius: 6px;

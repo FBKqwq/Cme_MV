@@ -10,6 +10,11 @@ interface NormalizedText {
   sourceIndexes: number[];
 }
 
+interface TextRange {
+  start: number;
+  end: number;
+}
+
 function normalizeWithMap(value: string): NormalizedText {
   let normalized = "";
   const sourceIndexes: number[] = [];
@@ -26,6 +31,29 @@ function normalizeWithMap(value: string): NormalizedText {
   return { value: normalized, sourceIndexes };
 }
 
+function findNormalizedMatch(
+  text: string,
+  candidate: string,
+  range: TextRange = { start: 0, end: text.length },
+): TextRange | undefined {
+  const start = Math.max(0, Math.min(text.length, range.start));
+  const end = Math.max(start, Math.min(text.length, range.end));
+  const normalizedSource = normalizeWithMap(text.slice(start, end));
+  const normalizedCandidate = normalizeWithMap(candidate).value;
+  if (!normalizedCandidate) return undefined;
+
+  const found = normalizedSource.value.indexOf(normalizedCandidate);
+  if (found < 0) return undefined;
+
+  return {
+    start: start + normalizedSource.sourceIndexes[found],
+    end:
+      start +
+      normalizedSource.sourceIndexes[found + normalizedCandidate.length - 1] +
+      1,
+  };
+}
+
 function evidenceCandidates(entity: EntityRecord): string[] {
   const candidates: string[] = [];
   // evidence_span (singular) from entity_nodes.base.jsonl format - most precise
@@ -40,30 +68,55 @@ function evidenceCandidates(entity: EntityRecord): string[] {
     if (span.text) candidates.push(span.text);
   }
   if (entity.evidence_text) candidates.push(entity.evidence_text);
-  if (entity.name) candidates.push(entity.name);
   return candidates.filter((v, i, a) => v.trim().length > 0 && a.indexOf(v) === i);
+}
+
+function declaredEvidenceRanges(entity: EntityRecord): TextRange[] {
+  const ranges: TextRange[] = [];
+  const addRange = (start?: number, end?: number) => {
+    if (
+      typeof start === "number" &&
+      typeof end === "number" &&
+      start >= 0 &&
+      end > start
+    ) {
+      ranges.push({ start, end });
+    }
+  };
+
+  addRange(entity.evidence_span?.start, entity.evidence_span?.end);
+  for (const span of entity.evidence_spans ?? []) {
+    addRange(span.start, span.end);
+  }
+  return ranges;
+}
+
+function findEntityName(text: string, entity: EntityRecord): TextRange | undefined {
+  if (!entity.name.trim()) return undefined;
+
+  for (const range of declaredEvidenceRanges(entity)) {
+    const match = findNormalizedMatch(text, entity.name, range);
+    if (match) return match;
+  }
+
+  for (const evidence of evidenceCandidates(entity)) {
+    const evidenceRange = findNormalizedMatch(text, evidence);
+    if (!evidenceRange) continue;
+    const match = findNormalizedMatch(text, entity.name, evidenceRange);
+    if (match) return match;
+  }
+
+  return findNormalizedMatch(text, entity.name);
 }
 
 export function buildHighlightSegments(
   text: string,
   entities: EntityRecord[],
 ): HighlightSegment[] {
-  const normalizedText = normalizeWithMap(text);
   const matches: Array<{ start: number; end: number; entity: EntityRecord }> = [];
 
   for (const entity of entities) {
-    let best: { start: number; end: number } | undefined;
-    for (const candidate of evidenceCandidates(entity)) {
-      const normalizedCandidate = normalizeWithMap(candidate).value;
-      if (!normalizedCandidate) continue;
-      const found = normalizedText.value.indexOf(normalizedCandidate);
-      if (found < 0) continue;
-      const start = normalizedText.sourceIndexes[found];
-      const end =
-        normalizedText.sourceIndexes[found + normalizedCandidate.length - 1] + 1;
-      best = { start, end };
-      break;
-    }
+    const best = findEntityName(text, entity);
     if (best) matches.push({ ...best, entity });
   }
 

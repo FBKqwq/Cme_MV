@@ -20,6 +20,7 @@ def make_task(
     *,
     invalid_chunk: bool = False,
     with_pdf: bool = False,
+    with_label_result: bool = False,
 ) -> ReviewRepository:
     review_root = tmp_path / "data" / "review"
     inbox = review_root / "current"
@@ -84,6 +85,31 @@ def make_task(
         nodes_dir / "测试共识.entity_nodes.base.jsonl",
         entities,
     )
+    if with_label_result:
+        write_jsonl(
+            nodes_dir / "测试共识.entity_label_result.jsonl",
+            [
+                *entities,
+                {
+                    "entity_id": "E03",
+                    "chunk_id": "CH01",
+                    "entity_type": "",
+                    "proposed_entity_type": "symptoms",
+                    "name": "待复验症状",
+                    "evidence_text": "待复验症状",
+                    "status": "review",
+                },
+                {
+                    "entity_id": "E04",
+                    "chunk_id": "CH01",
+                    "entity_type": "",
+                    "teacher_candidate_type": "symptoms",
+                    "name": "已拒绝症状",
+                    "evidence_text": "已拒绝症状",
+                    "status": "rejected",
+                },
+            ],
+        )
     schema_path = inbox / "graph_property_schema_v3_6.json"
     schema_path.write_text(
         json.dumps(schema, ensure_ascii=False),
@@ -126,6 +152,166 @@ def test_import_and_task_hash_are_stable(tmp_path: Path) -> None:
     ]
 
 
+def test_complete_label_result_overrides_base_file(tmp_path: Path) -> None:
+    repository = make_task(tmp_path, with_label_result=True)
+    detail = repository.chunk_detail("TEST_CH01")
+
+    assert {entity["entity_id"] for entity in detail["entities"]} == {
+        "E01",
+        "E02",
+        "E03",
+        "E04",
+    }
+    assert {entity.get("status") for entity in detail["entities"]} == {
+        None,
+        "review",
+        "rejected",
+    }
+    assert {
+        entity["entity_type"]
+        for entity in detail["entities"]
+        if entity["entity_id"] in {"E03", "E04"}
+    } == {"symptoms"}
+    assert any(
+        name.endswith(".entity_label_result.jsonl")
+        for name in repository.checksums
+    )
+    assert not any(
+        name.endswith(".entity_nodes.base.jsonl")
+        for name in repository.checksums
+    )
+
+
+def test_source_upgrade_preserves_existing_human_review(tmp_path: Path) -> None:
+    repository = make_task(tmp_path)
+    repository.update_entity(
+        "E02",
+        {
+            "base_version": 0,
+            "chunk_id": "TEST_CH01",
+            "scope": "current",
+            "status": "accepted",
+        },
+    )
+    nodes_dir = repository.inbox_root / "entity_nodes"
+    base_entities = [
+        json.loads(line)
+        for line in (
+            nodes_dir / "测试共识.entity_nodes.base.jsonl"
+        ).read_text(encoding="utf-8").splitlines()
+        if line
+    ]
+    write_jsonl(
+        nodes_dir / "测试共识.entity_label_result.jsonl",
+        [
+            *base_entities,
+            {
+                "entity_id": "E03",
+                "chunk_id": "CH01",
+                "entity_type": "symptoms",
+                "name": "待复验症状",
+                "evidence_text": "待复验症状",
+                "status": "review",
+            },
+        ],
+    )
+
+    reloaded = ReviewRepository(
+        project_root=tmp_path,
+        inbox_root=repository.inbox_root,
+        result_root=repository.result_root,
+        export_root=repository.export_root,
+        schema_path=repository.schema_path,
+    )
+    detail = reloaded.chunk_detail("TEST_CH01")
+    approved = next(
+        entity for entity in detail["entities"] if entity["entity_id"] == "E02"
+    )
+
+    assert approved["_review"]["operation"] == "update"
+    assert approved["status"] == "accepted"
+    assert any(entity["entity_id"] == "E03" for entity in detail["entities"])
+
+
+def test_chunk_entity_snapshot_saves_once_and_restores(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = make_task(tmp_path)
+    save_calls = 0
+    original_save = repository._save_result
+
+    def counted_save(document_id: str) -> None:
+        nonlocal save_calls
+        save_calls += 1
+        original_save(document_id)
+
+    monkeypatch.setattr(repository, "_save_result", counted_save)
+    saved = repository.save_chunk_entities(
+        "TEST_CH01",
+        {
+            "base_version": 0,
+            "entities": [
+                {
+                    "entity_id": "E01",
+                    "name": "白塞综合征",
+                    "entity_type": "sub_diseases",
+                    "evidence_text": "白塞综合征",
+                    "rejected": False,
+                },
+                {
+                    "entity_id": "E02",
+                    "name": "复发性口腔溃疡",
+                    "entity_type": "symptoms",
+                    "evidence_text": "反复口腔溃疡",
+                    "rejected": True,
+                },
+            ],
+        },
+    )
+    detail = repository.chunk_detail("TEST_CH01")
+    rejected = next(
+        entity for entity in detail["entities"] if entity["entity_id"] == "E02"
+    )
+
+    assert saved == {"chunk_id": "TEST_CH01", "changed": 1, "version": 1}
+    assert save_calls == 1
+    assert rejected["name"] == "复发性口腔溃疡"
+    assert rejected["_review"]["deleted"] is True
+
+    restored = repository.save_chunk_entities(
+        "TEST_CH01",
+        {
+            "base_version": 1,
+            "entities": [
+                {
+                    "entity_id": "E01",
+                    "name": "白塞综合征",
+                    "entity_type": "sub_diseases",
+                    "evidence_text": "白塞综合征",
+                    "rejected": False,
+                },
+                {
+                    "entity_id": "E02",
+                    "name": "复发性口腔溃疡",
+                    "entity_type": "symptoms",
+                    "evidence_text": "反复口腔溃疡",
+                    "rejected": False,
+                },
+            ],
+        },
+    )
+    detail = repository.chunk_detail("TEST_CH01")
+    restored_entity = next(
+        entity for entity in detail["entities"] if entity["entity_id"] == "E02"
+    )
+
+    assert restored["version"] == 2
+    assert save_calls == 2
+    assert restored_entity["name"] == "复发性口腔溃疡"
+    assert restored_entity["_review"]["deleted"] is False
+
+
 def test_entity_edit_creates_conflict_and_rejects_stale_version(
     tmp_path: Path,
 ) -> None:
@@ -145,7 +331,7 @@ def test_entity_edit_creates_conflict_and_rejects_stale_version(
     assert result["version"] == 1
     assert edited["name"] == "复发性口腔溃疡"
     assert edited["review_canonical_id"].startswith("REVIEW_CANON_")
-    assert detail["relationships"][0]["conflicts"][0]["code"] == "needs_rebind"
+    assert detail["relationships"] == []
     result_file = repository.result_root / "测试共识.review.json"
     persisted = json.loads(result_file.read_text(encoding="utf-8"))
     persisted_entity = next(
@@ -171,10 +357,20 @@ def test_entity_edit_creates_conflict_and_rejects_stale_version(
 
 def test_soft_delete_restore_and_relation_conflict(tmp_path: Path) -> None:
     repository = make_task(tmp_path)
+    created = repository.create_relationship(
+        {
+            "base_version": 0,
+            "chunk_id": "TEST_CH01",
+            "start_entity_id": "E01",
+            "relation_type": "manifests_as",
+            "end_entity_id": "E02",
+            "evidence_text": "主要表现为反复口腔溃疡",
+        }
+    )
     deleted = repository.delete_entity(
         "E02",
         chunk_id="TEST_CH01",
-        base_version=0,
+        base_version=created["version"],
     )
     detail = repository.chunk_detail("TEST_CH01")
     entity = next(item for item in detail["entities"] if item["entity_id"] == "E02")
@@ -191,6 +387,17 @@ def test_soft_delete_restore_and_relation_conflict(tmp_path: Path) -> None:
     entity = next(item for item in restored["entities"] if item["entity_id"] == "E02")
     assert entity["_review"]["deleted"] is False
     assert restored["relationships"][0]["conflicts"] == []
+
+
+def test_entities_do_not_create_synthetic_relationships(tmp_path: Path) -> None:
+    repository = make_task(tmp_path)
+
+    detail = repository.chunk_detail("TEST_CH01")
+    summary = repository.chunk_summaries()[0]
+
+    assert detail["relationships"] == []
+    assert summary["relation_count"] == 0
+    assert summary["issue_count"] == 0
 
 
 def test_approve_reload_and_final_export(tmp_path: Path) -> None:

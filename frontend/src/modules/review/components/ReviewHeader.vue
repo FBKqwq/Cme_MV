@@ -291,6 +291,10 @@ const emit = defineEmits<{
   color: var(--teal);
 }
 
+.save-indicator.dirty {
+  color: var(--amber);
+}
+
 .save-indicator.error {
   color: var(--red);
 }

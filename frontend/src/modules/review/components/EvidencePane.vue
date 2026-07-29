@@ -8,7 +8,6 @@ import {
   ChevronRight,
   ExternalLink,
   FileText,
-  Highlighter,
   LoaderCircle,
   Plus,
 } from "lucide-vue-next";
@@ -116,10 +115,13 @@ const emit = defineEmits<{
                   accepted:
                     !segment.entity._review.deleted &&
                     segment.entity.status === 'accepted',
-                  rejected: segment.entity._review.deleted,
+                  rejected:
+                    segment.entity._review.deleted ||
+                    segment.entity.status === 'rejected',
                   review:
                     !segment.entity._review.deleted &&
-                    segment.entity.status !== 'accepted',
+                    segment.entity.status !== 'accepted' &&
+                    segment.entity.status !== 'rejected',
                 },
               ]"
               type="button"
@@ -355,6 +357,11 @@ const emit = defineEmits<{
 
 .entity-highlight.rejected {
   --highlight-border: #dc2626;
+  color: #b91c1c;
+  background: rgba(220, 38, 38, 0.1);
+  text-decoration: line-through;
+  text-decoration-color: #dc2626;
+  text-decoration-thickness: 1.5px;
 }
 
 .entity-highlight.review {
@@ -368,6 +375,12 @@ const emit = defineEmits<{
   box-shadow:
     inset 0 0 0 1px var(--highlight-border),
     0 0 0 2px rgba(89, 100, 223, 0.13);
+}
+
+.entity-highlight.rejected:hover,
+.entity-highlight.rejected.active {
+  color: #b91c1c;
+  background: rgba(220, 38, 38, 0.15);
 }
 
 .entity-highlight.modified,
