@@ -1,0 +1,3265 @@
+{
+  "doc_id": "DOC_b4ffc09a1aa0",
+  "pdf_path": "C:\\Users\\zhurunjie\\Desktop\\snorkel\\code\\data\\F_pipeline_run_test_5\\raw_pdf\\变应性支气管肺曲霉病诊治专家共识.pdf",
+  "source_title": "变应性支气管肺曲霉病诊治专家共识",
+  "chunking_method": "section_semantic_v1",
+  "total_pages": 7,
+  "total_chunks": 17,
+  "dropped_chunks": [],
+  "unit_exponent_corrections": [],
+  "document_cjk_ratio": 0.5118,
+  "chunks": [
+    {
+      "chunk_id": "CH0001",
+      "section_title": "变应性支气管肺曲霉病诊治专家共识",
+      "section_path": [
+        "正文",
+        "变应性支气管肺曲霉病诊治专家共识"
+      ],
+      "source_section_paths": [
+        [
+          "正文",
+          "变应性支气管肺曲霉病诊治专家共识"
+        ]
+      ],
+      "page_start": 1,
+      "page_end": 1,
+      "page_span": {
+        "start": {
+          "page": 1,
+          "offset": 0
+        },
+        "end": {
+          "page": 1,
+          "offset": 483
+        }
+      },
+      "text_span": {
+        "start": 0,
+        "end": 483
+      },
+      "text": "变应性支气管肺曲霉病诊治专家共识\n中华医学会呼吸病学分会哮喘学组\n变应性支气管肺曲霉病(allergic\nbronchopulmonaryaspergillosis，ABPA)是烟曲霉致\n敏引起的一种变应性肺部疾病，表现为慢性支气管\n哮喘(简称哮喘)和反复出现的肺部阴影，可伴有支\n气管扩张。该病相对少见，临床上常被误诊或漏\n诊_l；而早期诊断、及时给予全身糖皮质激素(简称\n激素)治疗，可控制病情，防止不可逆性肺部损害的\n发生_2引。少见情况下，其他真菌也可引起与ABPA\n相似的表现，统称变应性支气管肺真菌病(allergic\nbronchopulmonarymycosis，ABPM)。\n近年来ABPA逐步引起我国临床医师重视，病\n例资料不断见诸报道 J，但由于该病临床表现多\n样，诊断标准不一，且需要特殊的实验室检查，临床\n上存在诊断不及时、治疗不规范等情况。\n为了进一步提高ABPA的诊断和治疗水平，推\n动相关领域的临床研究，中华医学会呼吸病学分会\n哮喘学组有关专家在充分复习文献，掌握国内外相\n关研究进展的基础上，结合我国实际情况，讨论制定\n本专家共识。",
+      "text_quality": {
+        "cjk_ratio": 0.7229
+      },
+      "anchors": {
+        "sha1_12": "34311d5a9802",
+        "head_80": "变应性支气管肺曲霉病诊治专家共识\n中华医学会呼吸病学分会哮喘学组\n变应性支气管肺曲霉病(allergic\nbronchopulmonaryaspergillos"
+      },
+      "document_core_disease": "变应性支气管肺曲霉病",
+      "document_core_diseases": [
+        "变应性支气管肺曲霉病"
+      ],
+      "metadata": {
+        "document_core_disease": "变应性支气管肺曲霉病",
+        "document_core_diseases": [
+          "变应性支气管肺曲霉病"
+        ],
+        "core_disease_resolution": {
+          "status": "resolved",
+          "source": "llm_title",
+          "core_diseases": [
+            {
+              "name": "变应性支气管肺曲霉病",
+              "title_evidence": "变应性支气管肺曲霉病诊治专家共识",
+              "confidence": 1.0
+            }
+          ],
+          "document_core_diseases": [
+            "变应性支气管肺曲霉病"
+          ],
+          "document_core_disease": "变应性支气管肺曲霉病",
+          "required": true,
+          "pass": true,
+          "model": "qwen3.7-max",
+          "prompt_version": "document_core_disease_v1",
+          "validator_version": "document_core_disease_validator_v1",
+          "cache_hit": false,
+          "cache_key": "e86ff296ebcec56f406b71ef8743f76c1fc5739e291202882ffbf17be2a69a55",
+          "llm_status": "ok",
+          "llm_reason": "",
+          "llm_validated": {
+            "valid": true,
+            "status": "resolved",
+            "core_diseases": [
+              {
+                "name": "变应性支气管肺曲霉病",
+                "title_evidence": "变应性支气管肺曲霉病诊治专家共识",
+                "confidence": 1.0
+              }
+            ],
+            "reason": "标题明确以‘变应性支气管肺曲霉病’为核心疾病主题，‘诊治专家共识’为文档功能词",
+            "reasons": []
+          },
+          "rule_result": {
+            "name": "变应性支气管肺曲霉病",
+            "status": "rule_confirmed",
+            "confidence": 0.98,
+            "source_title": "变应性支气管肺曲霉病诊治专家共识",
+            "cleaned_title": "变应性支气管肺曲霉病诊治专家共识",
+            "removed_suffix": "诊治专家共识",
+            "reason": ""
+          },
+          "quality_reasons": []
+        },
+        "inferred_department": "呼吸内科",
+        "department_inference_status": "ok"
+      },
+      "page_regions": [
+        {
+          "page": 1,
+          "bbox": [
+            38.0,
+            90.08263999999997,
+            372.48,
+            569.29752
+          ]
+        }
+      ],
+      "linked_tables": [],
+      "linked_figures": [
+        {
+          "object_id": "F_p001_odl_001",
+          "object_type": "figure",
+          "page": 1,
+          "caption": "",
+          "bbox": [
+            0.0,
+            0.0,
+            552.96,
+            751.92
+          ],
+          "link_reasons": [
+            "layout_proximity"
+          ],
+          "link_confidence": 0.65,
+          "ocr_status": "pending"
+        }
+      ]
+    },
+    {
+      "chunk_id": "CH0002",
+      "section_title": "第一部分流行病学",
+      "section_path": [
+        "正文",
+        "变应性支气管肺曲霉病诊治专家共识",
+        "第一部分流行病学"
+      ],
+      "source_section_paths": [
+        [
+          "正文",
+          "变应性支气管肺曲霉病诊治专家共识",
+          "第一部分流行病学"
+        ]
+      ],
+      "page_start": 1,
+      "page_end": 1,
+      "page_span": {
+        "start": {
+          "page": 1,
+          "offset": 484
+        },
+        "end": {
+          "page": 1,
+          "offset": 916
+        }
+      },
+      "text_span": {
+        "start": 484,
+        "end": 916
+      },
+      "text": "第一部分流行病学\nABPA较常发生于哮喘患者，研究显示ABPA\n在哮喘中所占比例为1．0％～3．5％ 。国内研究\n发现在连续就诊的哮喘患者中2．5％为ABPAlio]。\n项系统性综述结果显示，在就诊于呼吸专科或哮\n一\n喘专科的哮喘患者中，ABPA的比例可达\n12．9％_l 除哮喘外，ABPA还可见于其他疾病。\n。\n在欧美国家，肺囊性纤维化并发ABPA相对多见，病\n例汇总后所得患病率为8．9％_l。此外，ABPA还\n可发生于其他肺部疾病患者，例如支气管扩张¨、\n慢性阻塞性肺疾病等 ‘。。\nDOI：10．3760／cma．j．issn．0376-2491．2017．34．003\n学科，Email：suny@bjmu．edu．cn；沈华浩，310009，浙江大学医学院附\n属第二医院呼吸与危重症医学科，Email：huahaoshen@163．con\n34期NatlMedJChina，September12，2017．Vo1．97．No．34\n标准与规范．\n．",
+      "text_quality": {
+        "cjk_ratio": 0.455
+      },
+      "anchors": {
+        "sha1_12": "b5121bf31544",
+        "head_80": "第一部分流行病学\nABPA较常发生于哮喘患者，研究显示ABPA\n在哮喘中所占比例为1．0％～3．5％ 。国内研究\n发现在连续就诊的哮喘患者中2．5％为ABPAl"
+      },
+      "document_core_disease": "变应性支气管肺曲霉病",
+      "document_core_diseases": [
+        "变应性支气管肺曲霉病"
+      ],
+      "metadata": {
+        "document_core_disease": "变应性支气管肺曲霉病",
+        "document_core_diseases": [
+          "变应性支气管肺曲霉病"
+        ],
+        "core_disease_resolution": {
+          "status": "resolved",
+          "source": "llm_title",
+          "core_diseases": [
+            {
+              "name": "变应性支气管肺曲霉病",
+              "title_evidence": "变应性支气管肺曲霉病诊治专家共识",
+              "confidence": 1.0
+            }
+          ],
+          "document_core_diseases": [
+            "变应性支气管肺曲霉病"
+          ],
+          "document_core_disease": "变应性支气管肺曲霉病",
+          "required": true,
+          "pass": true,
+          "model": "qwen3.7-max",
+          "prompt_version": "document_core_disease_v1",
+          "validator_version": "document_core_disease_validator_v1",
+          "cache_hit": false,
+          "cache_key": "e86ff296ebcec56f406b71ef8743f76c1fc5739e291202882ffbf17be2a69a55",
+          "llm_status": "ok",
+          "llm_reason": "",
+          "llm_validated": {
+            "valid": true,
+            "status": "resolved",
+            "core_diseases": [
+              {
+                "name": "变应性支气管肺曲霉病",
+                "title_evidence": "变应性支气管肺曲霉病诊治专家共识",
+                "confidence": 1.0
+              }
+            ],
+            "reason": "标题明确以‘变应性支气管肺曲霉病’为核心疾病主题，‘诊治专家共识’为文档功能词",
+            "reasons": []
+          },
+          "rule_result": {
+            "name": "变应性支气管肺曲霉病",
+            "status": "rule_confirmed",
+            "confidence": 0.98,
+            "source_title": "变应性支气管肺曲霉病诊治专家共识",
+            "cleaned_title": "变应性支气管肺曲霉病诊治专家共识",
+            "removed_suffix": "诊治专家共识",
+            "reason": ""
+          },
+          "quality_reasons": []
+        },
+        "inferred_department": "呼吸内科",
+        "department_inference_status": "ok"
+      },
+      "page_regions": [
+        {
+          "page": 1,
+          "bbox": [
+            39.0,
+            28.955280000000016,
+            527.72,
+            724.9495999999999
+          ]
+        }
+      ],
+      "linked_tables": [],
+      "linked_figures": [
+        {
+          "object_id": "F_p001_odl_001",
+          "object_type": "figure",
+          "page": 1,
+          "caption": "",
+          "bbox": [
+            0.0,
+            0.0,
+            552.96,
+            751.92
+          ],
+          "link_reasons": [
+            "layout_proximity"
+          ],
+          "link_confidence": 0.65,
+          "ocr_status": "pending"
+        }
+      ]
+    },
+    {
+      "chunk_id": "CH0003",
+      "section_title": "第二部分临床表现",
+      "section_path": [
+        "正文",
+        "变应性支气管肺曲霉病诊治专家共识",
+        "第二部分临床表现"
+      ],
+      "source_section_paths": [
+        [
+          "正文",
+          "变应性支气管肺曲霉病诊治专家共识",
+          "第二部分临床表现"
+        ]
+      ],
+      "page_start": 1,
+      "page_end": 1,
+      "page_span": {
+        "start": {
+          "page": 1,
+          "offset": 917
+        },
+        "end": {
+          "page": 1,
+          "offset": 1282
+        }
+      },
+      "text_span": {
+        "start": 917,
+        "end": 1282
+      },
+      "text": "第二部分临床表现\nABPA多于哮喘诊断多年后发病，但也可见于\n新发哮喘。与其他过敏性疾病常见于儿童不同，\nABPA发病率在成年人最高 。由于临床对该病认\n识不足，常被漏诊，往往发展至晚期出现不可逆性结\n构改变才得以确诊。\nABPA的临床表现多种多样，缺乏特异性，主要\n表现为咳嗽、咳痰、喘息，还可见低热、消瘦、乏力、胸\n痛等。咳棕褐色黏冻样痰栓为特征性表现。存在支\n气管扩张时，可有不同程度的咯血。少数患者可以\n没有明显症状。急性加重时出现咳嗽、喘息、咯血、\n咳大量黄黏痰等。缓解期上述症状可消失或明显\n减轻。\n体检时肺部可闻及湿哕音或哮鸣音。晚期患者\n可出现杵状指和发绀。由于黏液嵌塞可引起肺不张\n甚至肺萎缩，体格检查可发现呼吸音减弱或闻及管\n状呼吸音。肺部浸润累及肺外周时，可发生胸膜炎，\n吸气时可伴胸壁活动受限和胸膜摩擦音。",
+      "text_quality": {
+        "cjk_ratio": 0.8732
+      },
+      "anchors": {
+        "sha1_12": "2277a485fdae",
+        "head_80": "第二部分临床表现\nABPA多于哮喘诊断多年后发病，但也可见于\n新发哮喘。与其他过敏性疾病常见于儿童不同，\nABPA发病率在成年人最高 。由于临床对该病认\n识不足"
+      },
+      "document_core_disease": "变应性支气管肺曲霉病",
+      "document_core_diseases": [
+        "变应性支气管肺曲霉病"
+      ],
+      "metadata": {
+        "document_core_disease": "变应性支气管肺曲霉病",
+        "document_core_diseases": [
+          "变应性支气管肺曲霉病"
+        ],
+        "core_disease_resolution": {
+          "status": "resolved",
+          "source": "llm_title",
+          "core_diseases": [
+            {
+              "name": "变应性支气管肺曲霉病",
+              "title_evidence": "变应性支气管肺曲霉病诊治专家共识",
+              "confidence": 1.0
+            }
+          ],
+          "document_core_diseases": [
+            "变应性支气管肺曲霉病"
+          ],
+          "document_core_disease": "变应性支气管肺曲霉病",
+          "required": true,
+          "pass": true,
+          "model": "qwen3.7-max",
+          "prompt_version": "document_core_disease_v1",
+          "validator_version": "document_core_disease_validator_v1",
+          "cache_hit": false,
+          "cache_key": "e86ff296ebcec56f406b71ef8743f76c1fc5739e291202882ffbf17be2a69a55",
+          "llm_status": "ok",
+          "llm_reason": "",
+          "llm_validated": {
+            "valid": true,
+            "status": "resolved",
+            "core_diseases": [
+              {
+                "name": "变应性支气管肺曲霉病",
+                "title_evidence": "变应性支气管肺曲霉病诊治专家共识",
+                "confidence": 1.0
+              }
+            ],
+            "reason": "标题明确以‘变应性支气管肺曲霉病’为核心疾病主题，‘诊治专家共识’为文档功能词",
+            "reasons": []
+          },
+          "rule_result": {
+            "name": "变应性支气管肺曲霉病",
+            "status": "rule_confirmed",
+            "confidence": 0.98,
+            "source_title": "变应性支气管肺曲霉病诊治专家共识",
+            "cleaned_title": "变应性支气管肺曲霉病诊治专家共识",
+            "removed_suffix": "诊治专家共识",
+            "reason": ""
+          },
+          "quality_reasons": []
+        },
+        "inferred_department": "呼吸内科",
+        "department_inference_status": "ok"
+      },
+      "page_regions": [
+        {
+          "page": 1,
+          "bbox": [
+            85.0,
+            167.89847999999995,
+            528.08,
+            569.29752
+          ]
+        }
+      ],
+      "linked_tables": [],
+      "linked_figures": [
+        {
+          "object_id": "F_p001_odl_001",
+          "object_type": "figure",
+          "page": 1,
+          "caption": "",
+          "bbox": [
+            0.0,
+            0.0,
+            552.96,
+            751.92
+          ],
+          "link_reasons": [
+            "layout_proximity"
+          ],
+          "link_confidence": 0.65,
+          "ocr_status": "pending"
+        }
+      ]
+    },
+    {
+      "chunk_id": "CH0004",
+      "section_title": "第三部分实验室检查",
+      "section_path": [
+        "正文",
+        "变应性支气管肺曲霉病诊治专家共识",
+        "第三部分实验室检查"
+      ],
+      "source_section_paths": [
+        [
+          "正文",
+          "变应性支气管肺曲霉病诊治专家共识",
+          "第三部分实验室检查"
+        ],
+        [
+          "正文",
+          "变应性支气管肺曲霉病诊治专家共识",
+          "第三部分实验室检查",
+          "皮肤试验"
+        ]
+      ],
+      "page_start": 1,
+      "page_end": 1,
+      "page_span": {
+        "start": {
+          "page": 1,
+          "offset": 1283
+        },
+        "end": {
+          "page": 1,
+          "offset": 1542
+        }
+      },
+      "text_span": {
+        "start": 1283,
+        "end": 1542
+      },
+      "text": "第三部分实验室检查\n皮肤试验\n一 、\n皮肤试验是检测变应原简单、快速的方法，包括\n点刺试验和皮内试验。建议首选皮肤点刺试验，若\n结果阴性，可继续进行皮内试验，因为有的患者可能\n仅在皮内试验时出现变态反应。针对烟曲霉的阳性\n速发型皮肤反应是诊断ABPA的必备条件之一。但\n由于其他真菌也可致病，当烟曲霉皮试呈阴性反应，\n而临床又高度疑诊时，则应进行其他曲菌或真菌的\n皮肤试验，例如白色念珠菌、交链孢菌、特异青霉等。\n需要注意的是受试者的受试部位、年龄、性别、试验\n时间，尤其是服用H1受体阻断剂等药物均可影响\n皮试结果。",
+      "text_quality": {
+        "cjk_ratio": 0.8898
+      },
+      "anchors": {
+        "sha1_12": "479bad40608f",
+        "head_80": "第三部分实验室检查\n皮肤试验\n一 、\n皮肤试验是检测变应原简单、快速的方法，包括\n点刺试验和皮内试验。建议首选皮肤点刺试验，若\n结果阴性，可继续进行皮内试验，因"
+      },
+      "document_core_disease": "变应性支气管肺曲霉病",
+      "document_core_diseases": [
+        "变应性支气管肺曲霉病"
+      ],
+      "metadata": {
+        "document_core_disease": "变应性支气管肺曲霉病",
+        "document_core_diseases": [
+          "变应性支气管肺曲霉病"
+        ],
+        "core_disease_resolution": {
+          "status": "resolved",
+          "source": "llm_title",
+          "core_diseases": [
+            {
+              "name": "变应性支气管肺曲霉病",
+              "title_evidence": "变应性支气管肺曲霉病诊治专家共识",
+              "confidence": 1.0
+            }
+          ],
+          "document_core_diseases": [
+            "变应性支气管肺曲霉病"
+          ],
+          "document_core_disease": "变应性支气管肺曲霉病",
+          "required": true,
+          "pass": true,
+          "model": "qwen3.7-max",
+          "prompt_version": "document_core_disease_v1",
+          "validator_version": "document_core_disease_validator_v1",
+          "cache_hit": false,
+          "cache_key": "e86ff296ebcec56f406b71ef8743f76c1fc5739e291202882ffbf17be2a69a55",
+          "llm_status": "ok",
+          "llm_reason": "",
+          "llm_validated": {
+            "valid": true,
+            "status": "resolved",
+            "core_diseases": [
+              {
+                "name": "变应性支气管肺曲霉病",
+                "title_evidence": "变应性支气管肺曲霉病诊治专家共识",
+                "confidence": 1.0
+              }
+            ],
+            "reason": "标题明确以‘变应性支气管肺曲霉病’为核心疾病主题，‘诊治专家共识’为文档功能词",
+            "reasons": []
+          },
+          "rule_result": {
+            "name": "变应性支气管肺曲霉病",
+            "status": "rule_confirmed",
+            "confidence": 0.98,
+            "source_title": "变应性支气管肺曲霉病诊治专家共识",
+            "cleaned_title": "变应性支气管肺曲霉病诊治专家共识",
+            "removed_suffix": "诊治专家共识",
+            "reason": ""
+          },
+          "quality_reasons": []
+        },
+        "inferred_department": "呼吸内科",
+        "department_inference_status": "ok"
+      },
+      "page_regions": [
+        {
+          "page": 1,
+          "bbox": [
+            39.0,
+            461.89847999999995,
+            528.6,
+            664.25848
+          ]
+        }
+      ],
+      "linked_tables": [],
+      "linked_figures": [
+        {
+          "object_id": "F_p001_odl_001",
+          "object_type": "figure",
+          "page": 1,
+          "caption": "",
+          "bbox": [
+            0.0,
+            0.0,
+            552.96,
+            751.92
+          ],
+          "link_reasons": [
+            "layout_proximity"
+          ],
+          "link_confidence": 0.65,
+          "ocr_status": "pending"
+        }
+      ]
+    },
+    {
+      "chunk_id": "CH0005",
+      "section_title": "二、血清学检查",
+      "section_path": [
+        "正文",
+        "变应性支气管肺曲霉病诊治专家共识",
+        "第三部分实验室检查",
+        "二、血清学检查"
+      ],
+      "source_section_paths": [
+        [
+          "正文",
+          "变应性支气管肺曲霉病诊治专家共识",
+          "第三部分实验室检查",
+          "二、血清学检查"
+        ]
+      ],
+      "page_start": 1,
+      "page_end": 2,
+      "page_span": {
+        "start": {
+          "page": 1,
+          "offset": 1543
+        },
+        "end": {
+          "page": 2,
+          "offset": 903
+        }
+      },
+      "text_span": {
+        "start": 1543,
+        "end": 2532
+      },
+      "text": "二、血清学检查\n1．血清总IgE(TIgE)测定：血清TIgE水平是\nABPA诊断及随访中最重要的免疫学指标之一。健\n康人、过敏性哮喘及ABPA患者血清TIgE水平均存\n\n在较大波动。就诊前接受治疗、尤其是全身激素治\n疗，可导致m清TIgE下降。因此，一旦怀疑ABPA\n应尽早在治疗前进行TIgE测定，在治疗过程中应动\n态监测TIgE的变化以指导药物调整。关于诊断\nABPA的血清TIgE界值，目前大多数学者建议为>\nl000U／ml(1U／ml=2．4．g／m1)’。。ABPA经治\n疗后，m清TIgE水平可降低，但大多数患者血清\nTIgE水平不会降至正常，因此需要多次随访并确定\n其个人的基线值。如果TIgE水平现明显回升，提\n示疾病复发。如果在未经全身激素治疗时血清\nTIgE处于正常水平．一般可除外活动性ABPA\n2．特异性lgE(sIgE)测定：曲霉slgE是ABPA\n特征性的诊断指标，用于诊断ABPA的界值为>\n0．35kUA／L(A指的是变应原)。在诊断ABPA\n的过程中，建议进行曲霉变应原皮试和炯曲霉sIgE\n水平联合检测(后者更加灵敏)。日前可用于检测\nslgE的方法有多种，其中以ImmunoCAP系统的荧光\n免疫法最为可靠，推荐使用该方法同时检测TIgE及\n烟曲霉sIgE[和(或)其他变应原slgE]。\n3．烟曲霉血清沉淀素或特异性IgG(s|gG)测\n定：采用琼脂凝胶双扩散法、酶联免疫法、荧光免疫\n法等均可检测血清特异性沉淀抗体。69％～90％的\nABPA患者可出现曲霉血清沉淀素阳性，但对于\nABPA的诊断特异性不高。。如果ABPA患者出现\n高滴度的曲霉slgG抗体，同时伴有胸膜纤维化或持\n续性肺部空}同形成，则提示为慢性肺曲霉病\nImmunoCAP的荧光免疫法测定曲霉slgG，灵敏度\n高且重复性好，可用于治疗过程中sIgG水平的动态\n注：lA．双肺片状渗出影、树芽征，右上肺为著；lB．左下肺黏液嵌塞征(指套征或牙膏征)(同一患者)；2A．左\n栓；2B．右中叶中央性支气管扩张；2C．右卜叶袖套征；2D．右下nf‘囊状支气管扩张和左下叶黏液栓；3A．肺部CT纵隔窗表现为高密度\n影的黏液栓；3B．肺部CT同一层面肺窗示右下肺黏液嵌塞征，左肺支气管扩张\n图l一3变应性支气管肺曲霉病的肺部CT影像学特征\n7，Vol97，No．34\n检测 。",
+      "text_quality": {
+        "cjk_ratio": 0.6484
+      },
+      "anchors": {
+        "sha1_12": "d56699533851",
+        "head_80": "二、血清学检查\n1．血清总IgE(TIgE)测定：血清TIgE水平是\nABPA诊断及随访中最重要的免疫学指标之一。健\n康人、过敏性哮喘及ABPA患者血清TIgE"
+      },
+      "document_core_disease": "变应性支气管肺曲霉病",
+      "document_core_diseases": [
+        "变应性支气管肺曲霉病"
+      ],
+      "metadata": {
+        "document_core_disease": "变应性支气管肺曲霉病",
+        "document_core_diseases": [
+          "变应性支气管肺曲霉病"
+        ],
+        "core_disease_resolution": {
+          "status": "resolved",
+          "source": "llm_title",
+          "core_diseases": [
+            {
+              "name": "变应性支气管肺曲霉病",
+              "title_evidence": "变应性支气管肺曲霉病诊治专家共识",
+              "confidence": 1.0
+            }
+          ],
+          "document_core_diseases": [
+            "变应性支气管肺曲霉病"
+          ],
+          "document_core_disease": "变应性支气管肺曲霉病",
+          "required": true,
+          "pass": true,
+          "model": "qwen3.7-max",
+          "prompt_version": "document_core_disease_v1",
+          "validator_version": "document_core_disease_validator_v1",
+          "cache_hit": false,
+          "cache_key": "e86ff296ebcec56f406b71ef8743f76c1fc5739e291202882ffbf17be2a69a55",
+          "llm_status": "ok",
+          "llm_reason": "",
+          "llm_validated": {
+            "valid": true,
+            "status": "resolved",
+            "core_diseases": [
+              {
+                "name": "变应性支气管肺曲霉病",
+                "title_evidence": "变应性支气管肺曲霉病诊治专家共识",
+                "confidence": 1.0
+              }
+            ],
+            "reason": "标题明确以‘变应性支气管肺曲霉病’为核心疾病主题，‘诊治专家共识’为文档功能词",
+            "reasons": []
+          },
+          "rule_result": {
+            "name": "变应性支气管肺曲霉病",
+            "status": "rule_confirmed",
+            "confidence": 0.98,
+            "source_title": "变应性支气管肺曲霉病诊治专家共识",
+            "cleaned_title": "变应性支气管肺曲霉病诊治专家共识",
+            "removed_suffix": "诊治专家共识",
+            "reason": ""
+          },
+          "quality_reasons": []
+        },
+        "inferred_department": "呼吸内科",
+        "department_inference_status": "ok"
+      },
+      "page_regions": [
+        {
+          "page": 1,
+          "bbox": [
+            39.0,
+            60.27455999999995,
+            522.6,
+            726.2927999999999
+          ]
+        },
+        {
+          "page": 2,
+          "bbox": [
+            21.0,
+            35.26960000000008,
+            490.2,
+            727.5039200000001
+          ]
+        }
+      ],
+      "linked_tables": [],
+      "linked_figures": [
+        {
+          "object_id": "F_p001_odl_001",
+          "object_type": "figure",
+          "page": 1,
+          "caption": "",
+          "bbox": [
+            0.0,
+            0.0,
+            552.96,
+            751.92
+          ],
+          "link_reasons": [
+            "layout_proximity"
+          ],
+          "link_confidence": 0.65,
+          "ocr_status": "pending"
+        },
+        {
+          "object_id": "F_p002_odl_001",
+          "object_type": "figure",
+          "page": 2,
+          "caption": "",
+          "bbox": [
+            0.0,
+            0.0,
+            564.96,
+            757.44
+          ],
+          "link_reasons": [
+            "layout_proximity"
+          ],
+          "link_confidence": 0.65,
+          "ocr_status": "pending"
+        }
+      ]
+    },
+    {
+      "chunk_id": "CH0006",
+      "section_title": "第三部分实验室检查",
+      "section_path": [
+        "正文",
+        "变应性支气管肺曲霉病诊治专家共识",
+        "第三部分实验室检查"
+      ],
+      "source_section_paths": [
+        [
+          "正文",
+          "变应性支气管肺曲霉病诊治专家共识",
+          "第三部分实验室检查",
+          "胸部影像学表现"
+        ],
+        [
+          "正文",
+          "变应性支气管肺曲霉病诊治专家共识",
+          "第三部分实验室检查",
+          "四、血嗜酸粒细胞计数"
+        ]
+      ],
+      "page_start": 2,
+      "page_end": 2,
+      "page_span": {
+        "start": {
+          "page": 2,
+          "offset": 904
+        },
+        "end": {
+          "page": 2,
+          "offset": 1492
+        }
+      },
+      "text_span": {
+        "start": 2533,
+        "end": 3121
+      },
+      "text": "胸部影像学表现\n、\nABPA常见的影像表现为肺部浸润影或实变\n影，其特点为一过性、反复性、游走性。肺浸润呈均\n质性斑片状、片状或点片状，部位不定，可累及单侧\n或双侧，上、中、下肺均可，但以上肺多见(图1)。对\n于ABPA具有一定特征性的表现包括黏液嵌塞、支\n气管扩张、小叶中心性结节、树芽征等(图l，2)。气\n道黏液嵌塞在ABPA很常见，胸部高分辨CT\n(HRCT)上表现为指套征或牙膏征。气道黏液栓通\n常为低密度影，但约20％可表现为高密度影 ，即\n气道内黏液栓密度高于脊柱旁肌肉的HRCT值\n(冈3)，被认为是ABPA特征性的影像表现之一。\n外周细支气管黏液阻塞可致“树芽征”。中心性支\n气管扩张曾是ABPA的诊断标准之一，但诊断\nABPA的敏感度仅为37％；而30％左右的ABPA只\n有周同性支气管扩张 。因此，目前认为支气管扩\n张只是ABPA的表现之一，而非诊断所必需。\n部分患者在疾病后期可出现肺部空腔、曲霉球\n形成及上肺纤维化，提示并发慢性肺曲霉病。\n四、血嗜酸粒细胞计数\nABPA患者常有外周嗜酸粒细胞计数升高，\n但对于诊断ABPA的敏感性和特异性不高 ；由于\n外周m嗜酸粒细胞与肺部嗜酸粒细胞浸润程度并不\n平行，即使外周ⅡIL嗜酸粒细胞计数正常，亦不能排除\nABPA。目前建议外周血嗜酸粒细胞增多作为ABPA\n辅助诊断指标，诊断界值为>0．5X10个／Llq。",
+      "text_quality": {
+        "cjk_ratio": 0.7531
+      },
+      "anchors": {
+        "sha1_12": "25a23f580589",
+        "head_80": "胸部影像学表现\n、\nABPA常见的影像表现为肺部浸润影或实变\n影，其特点为一过性、反复性、游走性。肺浸润呈均\n质性斑片状、片状或点片状，部位不定，可累及单侧\n或"
+      },
+      "document_core_disease": "变应性支气管肺曲霉病",
+      "document_core_diseases": [
+        "变应性支气管肺曲霉病"
+      ],
+      "metadata": {
+        "document_core_disease": "变应性支气管肺曲霉病",
+        "document_core_diseases": [
+          "变应性支气管肺曲霉病"
+        ],
+        "core_disease_resolution": {
+          "status": "resolved",
+          "source": "llm_title",
+          "core_diseases": [
+            {
+              "name": "变应性支气管肺曲霉病",
+              "title_evidence": "变应性支气管肺曲霉病诊治专家共识",
+              "confidence": 1.0
+            }
+          ],
+          "document_core_diseases": [
+            "变应性支气管肺曲霉病"
+          ],
+          "document_core_disease": "变应性支气管肺曲霉病",
+          "required": true,
+          "pass": true,
+          "model": "qwen3.7-max",
+          "prompt_version": "document_core_disease_v1",
+          "validator_version": "document_core_disease_validator_v1",
+          "cache_hit": false,
+          "cache_key": "e86ff296ebcec56f406b71ef8743f76c1fc5739e291202882ffbf17be2a69a55",
+          "llm_status": "ok",
+          "llm_reason": "",
+          "llm_validated": {
+            "valid": true,
+            "status": "resolved",
+            "core_diseases": [
+              {
+                "name": "变应性支气管肺曲霉病",
+                "title_evidence": "变应性支气管肺曲霉病诊治专家共识",
+                "confidence": 1.0
+              }
+            ],
+            "reason": "标题明确以‘变应性支气管肺曲霉病’为核心疾病主题，‘诊治专家共识’为文档功能词",
+            "reasons": []
+          },
+          "rule_result": {
+            "name": "变应性支气管肺曲霉病",
+            "status": "rule_confirmed",
+            "confidence": 0.98,
+            "source_title": "变应性支气管肺曲霉病诊治专家共识",
+            "cleaned_title": "变应性支气管肺曲霉病诊治专家共识",
+            "removed_suffix": "诊治专家共识",
+            "reason": ""
+          },
+          "quality_reasons": []
+        },
+        "inferred_department": "呼吸内科",
+        "department_inference_status": "ok"
+      },
+      "page_regions": [
+        {
+          "page": 2,
+          "bbox": [
+            274.0,
+            75.21280000000002,
+            509.6,
+            465.81280000000004
+          ]
+        }
+      ],
+      "linked_tables": [],
+      "linked_figures": [
+        {
+          "object_id": "F_p002_odl_001",
+          "object_type": "figure",
+          "page": 2,
+          "caption": "",
+          "bbox": [
+            0.0,
+            0.0,
+            564.96,
+            757.44
+          ],
+          "link_reasons": [
+            "layout_proximity"
+          ],
+          "link_confidence": 0.65,
+          "ocr_status": "pending"
+        }
+      ]
+    },
+    {
+      "chunk_id": "CH0007",
+      "section_title": "五、痰液检查",
+      "section_path": [
+        "正文",
+        "变应性支气管肺曲霉病诊治专家共识",
+        "第三部分实验室检查",
+        "五、痰液检查"
+      ],
+      "source_section_paths": [
+        [
+          "正文",
+          "变应性支气管肺曲霉病诊治专家共识",
+          "第三部分实验室检查",
+          "五、痰液检查"
+        ]
+      ],
+      "page_start": 2,
+      "page_end": 4,
+      "page_span": {
+        "start": {
+          "page": 2,
+          "offset": 1493
+        },
+        "end": {
+          "page": 4,
+          "offset": 492
+        }
+      },
+      "text_span": {
+        "start": 3122,
+        "end": 3635
+      },
+      "text": "五、痰液检查\nk叶舌段和左下叶黏液\n\n等；(3)血清烟曲霉slgG抗体或沉淀素阳性。\n疾病分型：肺部HRCT显示中心性支气管扩张或\n支气管黏液栓，即支气管扩张型ABPA(ABPA—B)；如\n无支气管扩张，则诊断为血清型ABPA(ABPA—S)。\n当临床考虑ABPA、拟行有关诊断检查时，建议\n首先进行血清曲霉sIgE测定和(或)曲霉皮试(前者\n更敏感)。如果其中之一阳性，应进一步检测血清\nTIgE，如>l000U／ml，进而行胸部cT、外周血嗜酸\n粒细胞计数、曲霉sIgG测定等。\nABPA的临床表现缺乏特征性，尤其是在疾病\n的早期，可被误诊或漏诊多年，但哮喘几乎是所有患\n者共同的临床表现。因而在哮喘管理中，无论病情\n严重程度或控制状态如何，均应高度警惕ABPA的\n发生。建议在所有哮喘患者进行曲霉变应原皮试和\n(或)曲霉sIgE检测以明确曲霉致敏情况。对于曲\n霉致敏的患者，应行进一步检查以及时明确是否存\n在ABPA。对于存在曲霉致敏，但尚未达到ABPA\n诊断标准的患者应定期随访，以便在出现支气管扩\n张或肺功能明显受损之前获得及时诊断。对于临床\n怀疑ABPA，但缺乏上述检查条件者，应及时转诊到\n有条件的医院进行诊治。",
+      "text_quality": {
+        "cjk_ratio": 0.7429
+      },
+      "anchors": {
+        "sha1_12": "a6222307a3a2",
+        "head_80": "五、痰液检查\nk叶舌段和左下叶黏液\n\n等；(3)血清烟曲霉slgG抗体或沉淀素阳性。\n疾病分型：肺部HRCT显示中心性支气管扩张或\n支气管黏液栓，即支气管扩张型"
+      },
+      "document_core_disease": "变应性支气管肺曲霉病",
+      "document_core_diseases": [
+        "变应性支气管肺曲霉病"
+      ],
+      "metadata": {
+        "document_core_disease": "变应性支气管肺曲霉病",
+        "document_core_diseases": [
+          "变应性支气管肺曲霉病"
+        ],
+        "core_disease_resolution": {
+          "status": "resolved",
+          "source": "llm_title",
+          "core_diseases": [
+            {
+              "name": "变应性支气管肺曲霉病",
+              "title_evidence": "变应性支气管肺曲霉病诊治专家共识",
+              "confidence": 1.0
+            }
+          ],
+          "document_core_diseases": [
+            "变应性支气管肺曲霉病"
+          ],
+          "document_core_disease": "变应性支气管肺曲霉病",
+          "required": true,
+          "pass": true,
+          "model": "qwen3.7-max",
+          "prompt_version": "document_core_disease_v1",
+          "validator_version": "document_core_disease_validator_v1",
+          "cache_hit": false,
+          "cache_key": "e86ff296ebcec56f406b71ef8743f76c1fc5739e291202882ffbf17be2a69a55",
+          "llm_status": "ok",
+          "llm_reason": "",
+          "llm_validated": {
+            "valid": true,
+            "status": "resolved",
+            "core_diseases": [
+              {
+                "name": "变应性支气管肺曲霉病",
+                "title_evidence": "变应性支气管肺曲霉病诊治专家共识",
+                "confidence": 1.0
+              }
+            ],
+            "reason": "标题明确以‘变应性支气管肺曲霉病’为核心疾病主题，‘诊治专家共识’为文档功能词",
+            "reasons": []
+          },
+          "rule_result": {
+            "name": "变应性支气管肺曲霉病",
+            "status": "rule_confirmed",
+            "confidence": 0.98,
+            "source_title": "变应性支气管肺曲霉病诊治专家共识",
+            "cleaned_title": "变应性支气管肺曲霉病诊治专家共识",
+            "removed_suffix": "诊治专家共识",
+            "reason": ""
+          },
+          "quality_reasons": []
+        },
+        "inferred_department": "呼吸内科",
+        "department_inference_status": "ok"
+      },
+      "page_regions": [
+        {
+          "page": 2,
+          "bbox": [
+            295.0,
+            81.58888000000002,
+            490.44,
+            688.5039200000001
+          ]
+        },
+        {
+          "page": 4,
+          "bbox": [
+            20.0,
+            57.84712000000002,
+            253.6,
+            376.65279999999996
+          ]
+        }
+      ],
+      "linked_tables": [],
+      "linked_figures": [
+        {
+          "object_id": "F_p002_odl_001",
+          "object_type": "figure",
+          "page": 2,
+          "caption": "",
+          "bbox": [
+            0.0,
+            0.0,
+            564.96,
+            757.44
+          ],
+          "link_reasons": [
+            "layout_proximity"
+          ],
+          "link_confidence": 0.65,
+          "ocr_status": "pending"
+        },
+        {
+          "object_id": "F_p004_odl_001",
+          "object_type": "figure",
+          "page": 4,
+          "caption": "",
+          "bbox": [
+            0.0,
+            0.0,
+            562.32,
+            755.28
+          ],
+          "link_reasons": [
+            "layout_proximity"
+          ],
+          "link_confidence": 0.65,
+          "ocr_status": "pending"
+        }
+      ]
+    },
+    {
+      "chunk_id": "CH0008",
+      "section_title": "第五部分自然病史和分期",
+      "section_path": [
+        "正文",
+        "变应性支气管肺曲霉病诊治专家共识",
+        "第五部分自然病史和分期"
+      ],
+      "source_section_paths": [
+        [
+          "正文",
+          "变应性支气管肺曲霉病诊治专家共识",
+          "第五部分自然病史和分期"
+        ]
+      ],
+      "page_start": 4,
+      "page_end": 4,
+      "page_span": {
+        "start": {
+          "page": 4,
+          "offset": 493
+        },
+        "end": {
+          "page": 4,
+          "offset": 748
+        }
+      },
+      "text_span": {
+        "start": 3636,
+        "end": 3891
+      },
+      "text": "第五部分自然病史和分期\n根据临床表现、血清学和影像学检查，ABPA的\n自然病程可分为I～V期 ，对于评价患者个体的\n疾病状况和转归有帮助。I期：新发的、活动性\nABPA；Ⅱ期：临床和血清学缓解期；m期：复发性活\n动性ABPA；1V期：慢性激素依赖性哮喘；V期：进行\n性炎症和气道扩张引起的纤维一空洞病变，可导致进\n展性呼吸衰竭和死亡。需要指出的是，ABPA的病\n程不一定按照上述顺序演变；在患者就诊时，也难以\n预料是否会进入缓解期，是否会复发，抑或持续进\n展。一般认为早期诊断和治疗可降低未来疾病进展\n的风险。",
+      "text_quality": {
+        "cjk_ratio": 0.8025
+      },
+      "anchors": {
+        "sha1_12": "6dfcee6ae88f",
+        "head_80": "第五部分自然病史和分期\n根据临床表现、血清学和影像学检查，ABPA的\n自然病程可分为I～V期 ，对于评价患者个体的\n疾病状况和转归有帮助。I期：新发的、活动性\n"
+      },
+      "document_core_disease": "变应性支气管肺曲霉病",
+      "document_core_diseases": [
+        "变应性支气管肺曲霉病"
+      ],
+      "metadata": {
+        "document_core_disease": "变应性支气管肺曲霉病",
+        "document_core_diseases": [
+          "变应性支气管肺曲霉病"
+        ],
+        "core_disease_resolution": {
+          "status": "resolved",
+          "source": "llm_title",
+          "core_diseases": [
+            {
+              "name": "变应性支气管肺曲霉病",
+              "title_evidence": "变应性支气管肺曲霉病诊治专家共识",
+              "confidence": 1.0
+            }
+          ],
+          "document_core_diseases": [
+            "变应性支气管肺曲霉病"
+          ],
+          "document_core_disease": "变应性支气管肺曲霉病",
+          "required": true,
+          "pass": true,
+          "model": "qwen3.7-max",
+          "prompt_version": "document_core_disease_v1",
+          "validator_version": "document_core_disease_validator_v1",
+          "cache_hit": false,
+          "cache_key": "e86ff296ebcec56f406b71ef8743f76c1fc5739e291202882ffbf17be2a69a55",
+          "llm_status": "ok",
+          "llm_reason": "",
+          "llm_validated": {
+            "valid": true,
+            "status": "resolved",
+            "core_diseases": [
+              {
+                "name": "变应性支气管肺曲霉病",
+                "title_evidence": "变应性支气管肺曲霉病诊治专家共识",
+                "confidence": 1.0
+              }
+            ],
+            "reason": "标题明确以‘变应性支气管肺曲霉病’为核心疾病主题，‘诊治专家共识’为文档功能词",
+            "reasons": []
+          },
+          "rule_result": {
+            "name": "变应性支气管肺曲霉病",
+            "status": "rule_confirmed",
+            "confidence": 0.98,
+            "source_title": "变应性支气管肺曲霉病诊治专家共识",
+            "cleaned_title": "变应性支气管肺曲霉病诊治专家共识",
+            "removed_suffix": "诊治专家共识",
+            "reason": ""
+          },
+          "quality_reasons": []
+        },
+        "inferred_department": "呼吸内科",
+        "department_inference_status": "ok"
+      },
+      "page_regions": [
+        {
+          "page": 4,
+          "bbox": [
+            21.0,
+            390.25847999999996,
+            251.6,
+            576.61848
+          ]
+        }
+      ],
+      "linked_tables": [],
+      "linked_figures": [
+        {
+          "object_id": "F_p004_odl_001",
+          "object_type": "figure",
+          "page": 4,
+          "caption": "",
+          "bbox": [
+            0.0,
+            0.0,
+            562.32,
+            755.28
+          ],
+          "link_reasons": [
+            "layout_proximity"
+          ],
+          "link_confidence": 0.65,
+          "ocr_status": "pending"
+        }
+      ]
+    },
+    {
+      "chunk_id": "CH0009",
+      "section_title": "第六部分鉴别诊断",
+      "section_path": [
+        "正文",
+        "变应性支气管肺曲霉病诊治专家共识",
+        "第六部分鉴别诊断"
+      ],
+      "source_section_paths": [
+        [
+          "正文",
+          "变应性支气管肺曲霉病诊治专家共识",
+          "第六部分鉴别诊断"
+        ]
+      ],
+      "page_start": 4,
+      "page_end": 4,
+      "page_span": {
+        "start": {
+          "page": 4,
+          "offset": 749
+        },
+        "end": {
+          "page": 4,
+          "offset": 1210
+        }
+      },
+      "text_span": {
+        "start": 3892,
+        "end": 4353
+      },
+      "text": "第六部分鉴别诊断\n曲霉和其他真菌在呼吸道和肺部引起的反应，\n临床上可有多种表现形式，包括真菌过敏性支气管\n炎、气道定植、真菌致敏性重症哮喘(severeasthma\nwithfungalsensitization，SAFS)、ABPA／ABPM、侵袭\n性肺真菌病等。ABPA也极易误诊为其他具有相似\n表现的呼吸道疾病，例如过敏性肺炎(外源性变应\n性肺泡炎)、变应性血管炎性肉芽肿、伴发哮喘的肺\n嗜酸粒细胞浸润症等。在我国，ABPA因其影像表\nPI1】be!I，I7 ．!!!!：\n现多样，加之上肺野病变多见，因而常被误诊为肺结\n核l' 。有时ABPA的团块状阴影(黏液栓)可被\n误诊为肺部肿瘤。\nSAFS是因真菌致敏导致的严重哮喘，其与\nABPA在临床表现和实验室检查方面多有相似之\n处，不易鉴别，尤其是血清型ABPA。SAFS的诊断\n标准包括：(1)难以控制的重症哮喘；(2)真菌致敏：\n真菌变应原皮试阳性或真菌slgE增高，但血清TIgE\n水平<1000U／ml221。SAFS患者无肺部浸润和支\n气管扩张等影像表现。",
+      "text_quality": {
+        "cjk_ratio": 0.6409
+      },
+      "anchors": {
+        "sha1_12": "8fcefd3c7cd0",
+        "head_80": "第六部分鉴别诊断\n曲霉和其他真菌在呼吸道和肺部引起的反应，\n临床上可有多种表现形式，包括真菌过敏性支气管\n炎、气道定植、真菌致敏性重症哮喘(severeasth"
+      },
+      "document_core_disease": "变应性支气管肺曲霉病",
+      "document_core_diseases": [
+        "变应性支气管肺曲霉病"
+      ],
+      "metadata": {
+        "document_core_disease": "变应性支气管肺曲霉病",
+        "document_core_diseases": [
+          "变应性支气管肺曲霉病"
+        ],
+        "core_disease_resolution": {
+          "status": "resolved",
+          "source": "llm_title",
+          "core_diseases": [
+            {
+              "name": "变应性支气管肺曲霉病",
+              "title_evidence": "变应性支气管肺曲霉病诊治专家共识",
+              "confidence": 1.0
+            }
+          ],
+          "document_core_diseases": [
+            "变应性支气管肺曲霉病"
+          ],
+          "document_core_disease": "变应性支气管肺曲霉病",
+          "required": true,
+          "pass": true,
+          "model": "qwen3.7-max",
+          "prompt_version": "document_core_disease_v1",
+          "validator_version": "document_core_disease_validator_v1",
+          "cache_hit": false,
+          "cache_key": "e86ff296ebcec56f406b71ef8743f76c1fc5739e291202882ffbf17be2a69a55",
+          "llm_status": "ok",
+          "llm_reason": "",
+          "llm_validated": {
+            "valid": true,
+            "status": "resolved",
+            "core_diseases": [
+              {
+                "name": "变应性支气管肺曲霉病",
+                "title_evidence": "变应性支气管肺曲霉病诊治专家共识",
+                "confidence": 1.0
+              }
+            ],
+            "reason": "标题明确以‘变应性支气管肺曲霉病’为核心疾病主题，‘诊治专家共识’为文档功能词",
+            "reasons": []
+          },
+          "rule_result": {
+            "name": "变应性支气管肺曲霉病",
+            "status": "rule_confirmed",
+            "confidence": 0.98,
+            "source_title": "变应性支气管肺曲霉病诊治专家共识",
+            "cleaned_title": "变应性支气管肺曲霉病诊治专家共识",
+            "removed_suffix": "诊治专家共识",
+            "reason": ""
+          },
+          "quality_reasons": []
+        },
+        "inferred_department": "呼吸内科",
+        "department_inference_status": "ok"
+      },
+      "page_regions": [
+        {
+          "page": 4,
+          "bbox": [
+            21.0,
+            32.90391999999997,
+            507.6,
+            730.61848
+          ]
+        }
+      ],
+      "linked_tables": [],
+      "linked_figures": [
+        {
+          "object_id": "F_p004_odl_001",
+          "object_type": "figure",
+          "page": 4,
+          "caption": "",
+          "bbox": [
+            0.0,
+            0.0,
+            562.32,
+            755.28
+          ],
+          "link_reasons": [
+            "layout_proximity"
+          ],
+          "link_confidence": 0.65,
+          "ocr_status": "pending"
+        }
+      ]
+    },
+    {
+      "chunk_id": "CH0010",
+      "section_title": "第七部分治疗",
+      "section_path": [
+        "正文",
+        "变应性支气管肺曲霉病诊治专家共识",
+        "第七部分治疗"
+      ],
+      "source_section_paths": [
+        [
+          "正文",
+          "变应性支气管肺曲霉病诊治专家共识",
+          "第七部分治疗"
+        ],
+        [
+          "正文",
+          "变应性支气管肺曲霉病诊治专家共识",
+          "第七部分治疗",
+          "避免变应原接触"
+        ],
+        [
+          "正文",
+          "变应性支气管肺曲霉病诊治专家共识",
+          "第七部分治疗",
+          "二、激素"
+        ]
+      ],
+      "page_start": 4,
+      "page_end": 4,
+      "page_span": {
+        "start": {
+          "page": 4,
+          "offset": 1211
+        },
+        "end": {
+          "page": 4,
+          "offset": 1822
+        }
+      },
+      "text_span": {
+        "start": 4354,
+        "end": 4965
+      },
+      "text": "第七部分治疗\nABPA的治疗目标包括控制症状，预防急性加\n重，防止或减轻肺功能受损¨2J。治疗药物在抑制机\n体曲霉变态反应的同时，清除气道内曲霉定植，防止\n支气管及肺组织出现不可逆损伤。\n避免变应原接触\n一 、\nABPA患者应尽量避免接触曲霉等变应原，脱\n离过敏环境对于控制患者症状、减少急性发作非常\n重要。\n二、激素\n口服激素是治疗ABPA的基础治疗，不仅抑制\n过度免疫反应，同时可减轻曲霉引起的炎症损伤。\n早期应用口服激素治疗，可防止或减轻支气管扩张\n及肺纤维化造成的慢性肺损伤。绝大多数ABPA患\n者对口服激素治疗反应良好，短时间内症状缓解、肺\n部阴影吸收(图5)。口服激素的剂量及疗程取决于\n临床分期J。有研究提示，中等剂量激素与高剂量\n激素在治疗效果上相当，同时不良反应更少∞J。对\n于I期和Ⅲ期患者，通常使用的泼尼松起始剂量为\n0．5mg／kg，1次／d，2周；继以0．25mg／kg，1次／d，\n4～6周。然后根据病情试行减量，一般每2周减\n5～10mg，建议采用隔日给药方法’。治疗时间\n依据疾病严重程度不同而有所差异，总疗程通常在\n6个月以上。对于Ⅳ期患者，可能需要长期口服小\n剂量激素维持治疗。\n吸人激素(ICS)不作为ABPA的首选治疗方\n案，单独使用ICS并无临床获益 。但对于全身\n激素减量至≤10mg／d(泼尼松当量)的患者，联合\n使用ICS可能有助于哮喘症状的控制，同时可减少\n全身激素用量。",
+      "text_quality": {
+        "cjk_ratio": 0.7755
+      },
+      "anchors": {
+        "sha1_12": "f9bfa7a17b6e",
+        "head_80": "第七部分治疗\nABPA的治疗目标包括控制症状，预防急性加\n重，防止或减轻肺功能受损¨2J。治疗药物在抑制机\n体曲霉变态反应的同时，清除气道内曲霉定植，防止\n支气"
+      },
+      "document_core_disease": "变应性支气管肺曲霉病",
+      "document_core_diseases": [
+        "变应性支气管肺曲霉病"
+      ],
+      "metadata": {
+        "document_core_disease": "变应性支气管肺曲霉病",
+        "document_core_diseases": [
+          "变应性支气管肺曲霉病"
+        ],
+        "core_disease_resolution": {
+          "status": "resolved",
+          "source": "llm_title",
+          "core_diseases": [
+            {
+              "name": "变应性支气管肺曲霉病",
+              "title_evidence": "变应性支气管肺曲霉病诊治专家共识",
+              "confidence": 1.0
+            }
+          ],
+          "document_core_diseases": [
+            "变应性支气管肺曲霉病"
+          ],
+          "document_core_disease": "变应性支气管肺曲霉病",
+          "required": true,
+          "pass": true,
+          "model": "qwen3.7-max",
+          "prompt_version": "document_core_disease_v1",
+          "validator_version": "document_core_disease_validator_v1",
+          "cache_hit": false,
+          "cache_key": "e86ff296ebcec56f406b71ef8743f76c1fc5739e291202882ffbf17be2a69a55",
+          "llm_status": "ok",
+          "llm_reason": "",
+          "llm_validated": {
+            "valid": true,
+            "status": "resolved",
+            "core_diseases": [
+              {
+                "name": "变应性支气管肺曲霉病",
+                "title_evidence": "变应性支气管肺曲霉病诊治专家共识",
+                "confidence": 1.0
+              }
+            ],
+            "reason": "标题明确以‘变应性支气管肺曲霉病’为核心疾病主题，‘诊治专家共识’为文档功能词",
+            "reasons": []
+          },
+          "rule_result": {
+            "name": "变应性支气管肺曲霉病",
+            "status": "rule_confirmed",
+            "confidence": 0.98,
+            "source_title": "变应性支气管肺曲霉病诊治专家共识",
+            "cleaned_title": "变应性支气管肺曲霉病诊治专家共识",
+            "removed_suffix": "诊治专家共识",
+            "reason": ""
+          },
+          "quality_reasons": []
+        },
+        "inferred_department": "呼吸内科",
+        "department_inference_status": "ok"
+      },
+      "page_regions": [
+        {
+          "page": 4,
+          "bbox": [
+            272.0,
+            220.25847999999996,
+            507.36,
+            684.6528
+          ]
+        }
+      ],
+      "linked_tables": [],
+      "linked_figures": [
+        {
+          "object_id": "F_p004_odl_001",
+          "object_type": "figure",
+          "page": 4,
+          "caption": "",
+          "bbox": [
+            0.0,
+            0.0,
+            562.32,
+            755.28
+          ],
+          "link_reasons": [
+            "layout_proximity"
+          ],
+          "link_confidence": 0.65,
+          "ocr_status": "pending"
+        }
+      ]
+    },
+    {
+      "chunk_id": "CH0011",
+      "section_title": "三、抗真菌药物",
+      "section_path": [
+        "正文",
+        "变应性支气管肺曲霉病诊治专家共识",
+        "第七部分治疗",
+        "三、抗真菌药物"
+      ],
+      "source_section_paths": [
+        [
+          "正文",
+          "变应性支气管肺曲霉病诊治专家共识",
+          "第七部分治疗",
+          "三、抗真菌药物"
+        ]
+      ],
+      "page_start": 4,
+      "page_end": 5,
+      "page_span": {
+        "start": {
+          "page": 4,
+          "offset": 1823
+        },
+        "end": {
+          "page": 5,
+          "offset": 721
+        }
+      },
+      "text_span": {
+        "start": 4966,
+        "end": 5742
+      },
+      "text": "三、抗真菌药物\n抗真菌药物可能通过减少真菌定植、减轻炎症\n反应而发挥治疗作用。对于激素依赖患者、激素治\n\n、、I{_治jIj，j翕0液嵌摩fll。；C、DIIfII{泼J{=I} 8J嗣J黏液_l≮术\n图s变JrI：芷LI’lllt~I由t柄心 IIl】l_{湖2粜；卉\n疗发心 ，汶他川．研究发 H11畔\n(ilril)IKIz【lI)I茈状，减少Ii服激崇川量，川II'J\n降低I[il．消n譬水 、减少痰嗜酸粒 jJ包数门 。’\n战\"I-心通常的J1¨ 200n]g，lJjjl{，2次／cl，疗\n4～6 J1；＆¨j-术线JIJ约，I1r芎减 200n]g，\nI?Z／,I，4～6个JJ、fJ…{康唑有『1川{胶楚和几\n液 fIl利 Jj『《』iJ胶逝；li0剂嘤酸以利吸收，Itj\nj物或峻一饮料一服用，J、避免川¨、fJJ川质r\n{11JlliiJ弃Ij平【J’受约；ifiIfI]K液【J17．一jII,JI】HJ 1\nJ『…{f IJ 物利川 1、体人．‘条件\nc义jfr『『L约浓J建IIA'~川 fJ}『lttI(,iJlI：肋!代4，\ndJfi~小一J川I总 i ，伊l}f1i『 良\n少 ，他 J叟疹、暇 、心、：芯建、义川\n约 l'HJII测 J能\n近年研究发脱j他类伙立康畔\n(VOI”mzoh) 仃㈨样的疗效，J术收兽HJ‘j\n68ck～78％的心 “，小良反心少 ．也括肝功能\n拍；：、JJ叟端水J】I}t】、J芝、LL,、nKll视觉常相埘多\n约 【I】‘怏恢复。’对于fJ}川tIl】治疗尢\n，\n的心 ，换JIj伙● 仍r】J‘疗效 f火迂唑的\n川』浊川f，：200lT1g，li，1次／l2h(1f小质rL≥\n4()kg)，或1O0n]g．IlJJl《I1次／12l1(仆质越<\n4()k) IIfJIitti{唑",
+      "text_quality": {
+        "cjk_ratio": 0.3627
+      },
+      "anchors": {
+        "sha1_12": "17bda5264b02",
+        "head_80": "三、抗真菌药物\n抗真菌药物可能通过减少真菌定植、减轻炎症\n反应而发挥治疗作用。对于激素依赖患者、激素治\n\n、、I{_治jIj，j翕0液嵌摩fll。；C、DIIf"
+      },
+      "document_core_disease": "变应性支气管肺曲霉病",
+      "document_core_diseases": [
+        "变应性支气管肺曲霉病"
+      ],
+      "metadata": {
+        "document_core_disease": "变应性支气管肺曲霉病",
+        "document_core_diseases": [
+          "变应性支气管肺曲霉病"
+        ],
+        "core_disease_resolution": {
+          "status": "resolved",
+          "source": "llm_title",
+          "core_diseases": [
+            {
+              "name": "变应性支气管肺曲霉病",
+              "title_evidence": "变应性支气管肺曲霉病诊治专家共识",
+              "confidence": 1.0
+            }
+          ],
+          "document_core_diseases": [
+            "变应性支气管肺曲霉病"
+          ],
+          "document_core_disease": "变应性支气管肺曲霉病",
+          "required": true,
+          "pass": true,
+          "model": "qwen3.7-max",
+          "prompt_version": "document_core_disease_v1",
+          "validator_version": "document_core_disease_validator_v1",
+          "cache_hit": false,
+          "cache_key": "e86ff296ebcec56f406b71ef8743f76c1fc5739e291202882ffbf17be2a69a55",
+          "llm_status": "ok",
+          "llm_reason": "",
+          "llm_validated": {
+            "valid": true,
+            "status": "resolved",
+            "core_diseases": [
+              {
+                "name": "变应性支气管肺曲霉病",
+                "title_evidence": "变应性支气管肺曲霉病诊治专家共识",
+                "confidence": 1.0
+              }
+            ],
+            "reason": "标题明确以‘变应性支气管肺曲霉病’为核心疾病主题，‘诊治专家共识’为文档功能词",
+            "reasons": []
+          },
+          "rule_result": {
+            "name": "变应性支气管肺曲霉病",
+            "status": "rule_confirmed",
+            "confidence": 0.98,
+            "source_title": "变应性支气管肺曲霉病诊治专家共识",
+            "cleaned_title": "变应性支气管肺曲霉病诊治专家共识",
+            "removed_suffix": "诊治专家共识",
+            "reason": ""
+          },
+          "quality_reasons": []
+        },
+        "inferred_department": "呼吸内科",
+        "department_inference_status": "ok"
+      },
+      "page_regions": [
+        {
+          "page": 4,
+          "bbox": [
+            273.0,
+            690.0527999999999,
+            501.6,
+            730.6528
+          ]
+        },
+        {
+          "page": 5,
+          "bbox": [
+            41.0,
+            165.39528000000007,
+            317.92,
+            648.63456
+          ]
+        }
+      ],
+      "linked_tables": [],
+      "linked_figures": [
+        {
+          "object_id": "F_p004_odl_001",
+          "object_type": "figure",
+          "page": 4,
+          "caption": "",
+          "bbox": [
+            0.0,
+            0.0,
+            562.32,
+            755.28
+          ],
+          "link_reasons": [
+            "layout_proximity"
+          ],
+          "link_confidence": 0.65,
+          "ocr_status": "pending"
+        },
+        {
+          "object_id": "F_p005_odl_001",
+          "object_type": "figure",
+          "page": 5,
+          "caption": "",
+          "bbox": [
+            0.0,
+            0.0,
+            559.92,
+            753.36
+          ],
+          "link_reasons": [
+            "layout_proximity"
+          ],
+          "link_confidence": 0.65,
+          "ocr_status": "pending"
+        }
+      ]
+    },
+    {
+      "chunk_id": "CH0012",
+      "section_title": "第七部分治疗",
+      "section_path": [
+        "正文",
+        "变应性支气管肺曲霉病诊治专家共识",
+        "第七部分治疗"
+      ],
+      "source_section_paths": [
+        [
+          "正文",
+          "变应性支气管肺曲霉病诊治专家共识",
+          "第七部分治疗",
+          "【Ju、It；．(ig1~J,j物"
+        ]
+      ],
+      "page_start": 5,
+      "page_end": 5,
+      "page_span": {
+        "start": {
+          "page": 5,
+          "offset": 722
+        },
+        "end": {
+          "page": 5,
+          "offset": 863
+        }
+      },
+      "text_span": {
+        "start": 5743,
+        "end": 5884
+      },
+      "text": "【Ju、It；．(ig1~J,j物\nt 人；化 l：【、『1．降}庀休—— 与珠 ．十，\n(Oliltllizlllll；：lI1) jIfJ‘收状，减少急Pt-：发f1干口fi-：\n院次数，改：浮肺功能，减少I『Jj激 _i=fIj 。。\n报道料多个例验小样小究，【l前暂推\n使川",
+      "text_quality": {
+        "cjk_ratio": 0.3411
+      },
+      "anchors": {
+        "sha1_12": "f748f1f00f21",
+        "head_80": "【Ju、It；．(ig1~J,j物\nt 人；化 l：【、『1．降}庀休—— 与珠 ．十，\n(Oliltllizlllll；：lI1) jIfJ‘收状，减少急Pt"
+      },
+      "document_core_disease": "变应性支气管肺曲霉病",
+      "document_core_diseases": [
+        "变应性支气管肺曲霉病"
+      ],
+      "metadata": {
+        "document_core_disease": "变应性支气管肺曲霉病",
+        "document_core_diseases": [
+          "变应性支气管肺曲霉病"
+        ],
+        "core_disease_resolution": {
+          "status": "resolved",
+          "source": "llm_title",
+          "core_diseases": [
+            {
+              "name": "变应性支气管肺曲霉病",
+              "title_evidence": "变应性支气管肺曲霉病诊治专家共识",
+              "confidence": 1.0
+            }
+          ],
+          "document_core_diseases": [
+            "变应性支气管肺曲霉病"
+          ],
+          "document_core_disease": "变应性支气管肺曲霉病",
+          "required": true,
+          "pass": true,
+          "model": "qwen3.7-max",
+          "prompt_version": "document_core_disease_v1",
+          "validator_version": "document_core_disease_validator_v1",
+          "cache_hit": false,
+          "cache_key": "e86ff296ebcec56f406b71ef8743f76c1fc5739e291202882ffbf17be2a69a55",
+          "llm_status": "ok",
+          "llm_reason": "",
+          "llm_validated": {
+            "valid": true,
+            "status": "resolved",
+            "core_diseases": [
+              {
+                "name": "变应性支气管肺曲霉病",
+                "title_evidence": "变应性支气管肺曲霉病诊治专家共识",
+                "confidence": 1.0
+              }
+            ],
+            "reason": "标题明确以‘变应性支气管肺曲霉病’为核心疾病主题，‘诊治专家共识’为文档功能词",
+            "reasons": []
+          },
+          "rule_result": {
+            "name": "变应性支气管肺曲霉病",
+            "status": "rule_confirmed",
+            "confidence": 0.98,
+            "source_title": "变应性支气管肺曲霉病诊治专家共识",
+            "cleaned_title": "变应性支气管肺曲霉病诊治专家共识",
+            "removed_suffix": "诊治专家共识",
+            "reason": ""
+          },
+          "quality_reasons": []
+        },
+        "inferred_department": "呼吸内科",
+        "department_inference_status": "ok"
+      },
+      "page_regions": [
+        {
+          "page": 5,
+          "bbox": [
+            42.0,
+            290.71456,
+            317.92,
+            650.69848
+          ]
+        }
+      ],
+      "linked_tables": [],
+      "linked_figures": [
+        {
+          "object_id": "F_p005_odl_001",
+          "object_type": "figure",
+          "page": 5,
+          "caption": "",
+          "bbox": [
+            0.0,
+            0.0,
+            559.92,
+            753.36
+          ],
+          "link_reasons": [
+            "layout_proximity"
+          ],
+          "link_confidence": 0.65,
+          "ocr_status": "pending"
+        }
+      ]
+    },
+    {
+      "chunk_id": "CH0013",
+      "section_title": "第八部分病情监测和预后",
+      "section_path": [
+        "正文",
+        "变应性支气管肺曲霉病诊治专家共识",
+        "第八部分病情监测和预后"
+      ],
+      "source_section_paths": [
+        [
+          "正文",
+          "变应性支气管肺曲霉病诊治专家共识",
+          "第八部分病情监测和预后"
+        ]
+      ],
+      "page_start": 5,
+      "page_end": 5,
+      "page_span": {
+        "start": {
+          "page": 5,
+          "offset": 864
+        },
+        "end": {
+          "page": 5,
+          "offset": 1450
+        }
+      },
+      "text_span": {
+        "start": 5885,
+        "end": 6471
+      },
+      "text": "第八部分病情监测和预后\nAI{PA 牲受治后，最初铒6～8剧随\n1次．估状、ifii．i．rIgE水平、胸”、IJ』功能等\nj．1人缓们，lJl{IJii、jj，J，外删li'i[．Ⅱ受 H胞降f氐．\n。j足， 』r}5l乏Id\"JIK\n7h l5I’j；：变化\nI(il．浦TIgE降低Jf：稳定，可为痫缓 Til水\n、r址反映疾痫f动r的咂‘指f，J：，治疗l抓址他\nTIgl'；水平下降35％～50c／~以I；AIIIA心 ¨\n水、艮难恢复J!ijII!／i；‘范 ·舣l![Jj或HI心‘\n6～8蒯'\"Tbi0TIgE．以后铒2 川 l、欠；个缓\n每6个Jj-I复Al玖这一过 if1，\n，\nJT,ilhtl床缓解悄 ，定每一心 ’个人的 J线\n-\n：若FlgE较Jl线水平 l>2f，【!lJ使没 …脱\nIJ米症状肺洲影改变，摊爪疾，I 发\nJ力能俭 lllf以 fIti患者tl~ts．i．i_i]J_』J能受 I．\n-／3卜+少 1次\nABPA＆fifi邑IfI．Jj诊 』1规fj ，，『对iiiJ缓Irl；f\nJil_l{J]控制，颅较好使人数 !【JJ忠 ，』0\n悄可以稳定数 ，世忡J_JJ能受扎‘『 ·川\n，J【1于气干}l(¨V)<0．8【)} lJ较\nAl{l】A远j{IJ发也括巫气流受 、肺／f、怨\nPl!1]~b曲痫及肺乡tffit'f~",
+      "text_quality": {
+        "cjk_ratio": 0.3446
+      },
+      "anchors": {
+        "sha1_12": "4f66a44fd068",
+        "head_80": "第八部分病情监测和预后\nAI{PA 牲受治后，最初铒6～8剧随\n1次．估状、ifii．i．rIgE水平、胸”、IJ』功能等\nj．1人缓们，lJl{IJii、jj"
+      },
+      "document_core_disease": "变应性支气管肺曲霉病",
+      "document_core_diseases": [
+        "变应性支气管肺曲霉病"
+      ],
+      "metadata": {
+        "document_core_disease": "变应性支气管肺曲霉病",
+        "document_core_diseases": [
+          "变应性支气管肺曲霉病"
+        ],
+        "core_disease_resolution": {
+          "status": "resolved",
+          "source": "llm_title",
+          "core_diseases": [
+            {
+              "name": "变应性支气管肺曲霉病",
+              "title_evidence": "变应性支气管肺曲霉病诊治专家共识",
+              "confidence": 1.0
+            }
+          ],
+          "document_core_diseases": [
+            "变应性支气管肺曲霉病"
+          ],
+          "document_core_disease": "变应性支气管肺曲霉病",
+          "required": true,
+          "pass": true,
+          "model": "qwen3.7-max",
+          "prompt_version": "document_core_disease_v1",
+          "validator_version": "document_core_disease_validator_v1",
+          "cache_hit": false,
+          "cache_key": "e86ff296ebcec56f406b71ef8743f76c1fc5739e291202882ffbf17be2a69a55",
+          "llm_status": "ok",
+          "llm_reason": "",
+          "llm_validated": {
+            "valid": true,
+            "status": "resolved",
+            "core_diseases": [
+              {
+                "name": "变应性支气管肺曲霉病",
+                "title_evidence": "变应性支气管肺曲霉病诊治专家共识",
+                "confidence": 1.0
+              }
+            ],
+            "reason": "标题明确以‘变应性支气管肺曲霉病’为核心疾病主题，‘诊治专家共识’为文档功能词",
+            "reasons": []
+          },
+          "rule_result": {
+            "name": "变应性支气管肺曲霉病",
+            "status": "rule_confirmed",
+            "confidence": 0.98,
+            "source_title": "变应性支气管肺曲霉病诊治专家共识",
+            "cleaned_title": "变应性支气管肺曲霉病诊治专家共识",
+            "removed_suffix": "诊治专家共识",
+            "reason": ""
+          },
+          "quality_reasons": []
+        },
+        "inferred_department": "呼吸内科",
+        "department_inference_status": "ok"
+      },
+      "page_regions": [
+        {
+          "page": 5,
+          "bbox": [
+            43.0,
+            165.39528000000007,
+            530.12,
+            727.69848
+          ]
+        }
+      ],
+      "linked_tables": [],
+      "linked_figures": [
+        {
+          "object_id": "F_p005_odl_001",
+          "object_type": "figure",
+          "page": 5,
+          "caption": "",
+          "bbox": [
+            0.0,
+            0.0,
+            559.92,
+            753.36
+          ],
+          "link_reasons": [
+            "layout_proximity"
+          ],
+          "link_confidence": 0.65,
+          "ocr_status": "pending"
+        }
+      ]
+    },
+    {
+      "chunk_id": "CH0014",
+      "section_title": "第九部分有待研究的问题",
+      "section_path": [
+        "正文",
+        "变应性支气管肺曲霉病诊治专家共识",
+        "第九部分有待研究的问题"
+      ],
+      "source_section_paths": [
+        [
+          "正文",
+          "变应性支气管肺曲霉病诊治专家共识",
+          "第九部分有待研究的问题"
+        ]
+      ],
+      "page_start": 5,
+      "page_end": 6,
+      "page_span": {
+        "start": {
+          "page": 5,
+          "offset": 1451
+        },
+        "end": {
+          "page": 6,
+          "offset": 798
+        }
+      },
+      "text_span": {
+        "start": 6472,
+        "end": 7655
+      },
+      "text": "第九部分有待研究的问题\n!l，』我 【学喘心痫率I frl‘趋势．\n制率不容乐观，症哮~lt'l'1'7j ” 瞅父\n'lk、会联合发 I1，j一份j {rf，ABIA／AI{l、1\n傲视为哮喘的·利tI～型，办【{『J仃苛发 }J【的\n哮喘、 ’，址 -7~i!哮喘戈m治喘的Ir‘\n但我们尚缺乏、BP．、的I小流fJ：Ji学资料\n议刈我I小川地 f哮喘人群、特圳址r 哮喘人渐\n进行ABPA 断榆以叫蛳心和1危险\n建 ~llJf]我I州的例资~iiFi；；J 久惮小的队列\n叫确A A的II然痫 Jl\n，\n从l叫I史献报道lI『以行…I、BI’、俘较l的\n诊牢和误诊半。。。。，青疗力‘窠们|三范『lJ‘．…\nst't；仃必要对我 AI}PA的诊治现状逊行洲 ，\n埘F针埘性地他播ABPA诊i }J、提离味渗i\n水、。制汀适『I：一f'l：诊治观池仃 ‘也义\n\n目前采用的ABPA诊断标准多为专家观点和共 [2]PattersonK，StrekME．Allergicbronchopulmonaryaspergillosis\n【Jj．ProcAmThoracSoc，2010，7(3)：237-244．DOI：10．\n识意见，包括诊断所需的条目和重要指标的最佳界\n1513／pats．200908-086AL．\n值(例如血清TIgE)在内，均缺乏诊断研究证据的 [3]AgarwalR．Allergicbronchopulmonaryaspergillosis[J]，Chest，\n2009，135(3)：805-826．DOI：10．1378／chest．08-2586．\n支持。建议开展ABPA诊断标准的研究，为制订适\n[4]徐凌，蔡柏蔷，徐凯峰，等．变态反应性支气管肺曲菌病\n宜我国人群的诊断标准提供科学依据。 23例分析[J]．中华内科杂志，2007，46(3)：208-212．DOI：\n10．3760／j．issn：0578-1426．2007．03．010．\n口服激素是ABPA的基础治疗，但对于初始剂\n[5]叶枫，张挪富，钟南山，等．变应性支气管肺曲霉病三例并文\n量、剂量调整、疗程等，均缺乏一致意见；建议开展相献复习[J]．中华结核和呼吸杂志，2009，32(6)：434-438．\nDOI：10．3760／cma．j．issn．10014)939．2009．06．010．\n应研究予以明确。ICS对ABPA的治疗作用尚不明\n[6]李然，胥杰，孙永昌，等．变态反应性支气管肺曲霉菌病\n确，如何替代全身激素、使用的时机、剂量和疗程也 11例临床分析[J]．国际呼吸杂志，2011，31(21)：1601—\n1605．DOI：10．3760／cma．j．issn．1673-436X．2011．021．001．\n缺乏循证医学证据，建议开展相应研究。",
+      "text_quality": {
+        "cjk_ratio": 0.3989
+      },
+      "anchors": {
+        "sha1_12": "212772daf4ed",
+        "head_80": "第九部分有待研究的问题\n!l，』我 【学喘心痫率I frl‘趋势．\n制率不容乐观，症哮~lt'l'1'7j ” 瞅父\n'lk、会联合发 I1，j一份j {rf，"
+      },
+      "document_core_disease": "变应性支气管肺曲霉病",
+      "document_core_diseases": [
+        "变应性支气管肺曲霉病"
+      ],
+      "metadata": {
+        "document_core_disease": "变应性支气管肺曲霉病",
+        "document_core_diseases": [
+          "变应性支气管肺曲霉病"
+        ],
+        "core_disease_resolution": {
+          "status": "resolved",
+          "source": "llm_title",
+          "core_diseases": [
+            {
+              "name": "变应性支气管肺曲霉病",
+              "title_evidence": "变应性支气管肺曲霉病诊治专家共识",
+              "confidence": 1.0
+            }
+          ],
+          "document_core_diseases": [
+            "变应性支气管肺曲霉病"
+          ],
+          "document_core_disease": "变应性支气管肺曲霉病",
+          "required": true,
+          "pass": true,
+          "model": "qwen3.7-max",
+          "prompt_version": "document_core_disease_v1",
+          "validator_version": "document_core_disease_validator_v1",
+          "cache_hit": false,
+          "cache_key": "e86ff296ebcec56f406b71ef8743f76c1fc5739e291202882ffbf17be2a69a55",
+          "llm_status": "ok",
+          "llm_reason": "",
+          "llm_validated": {
+            "valid": true,
+            "status": "resolved",
+            "core_diseases": [
+              {
+                "name": "变应性支气管肺曲霉病",
+                "title_evidence": "变应性支气管肺曲霉病诊治专家共识",
+                "confidence": 1.0
+              }
+            ],
+            "reason": "标题明确以‘变应性支气管肺曲霉病’为核心疾病主题，‘诊治专家共识’为文档功能词",
+            "reasons": []
+          },
+          "rule_result": {
+            "name": "变应性支气管肺曲霉病",
+            "status": "rule_confirmed",
+            "confidence": 0.98,
+            "source_title": "变应性支气管肺曲霉病诊治专家共识",
+            "cleaned_title": "变应性支气管肺曲霉病诊治专家共识",
+            "removed_suffix": "诊治专家共识",
+            "reason": ""
+          },
+          "quality_reasons": []
+        },
+        "inferred_department": "呼吸内科",
+        "department_inference_status": "ok"
+      },
+      "page_regions": [
+        {
+          "page": 5,
+          "bbox": [
+            54.0,
+            290.71456,
+            530.36,
+            727.66416
+          ]
+        },
+        {
+          "page": 6,
+          "bbox": [
+            23.0,
+            58.34960000000001,
+            509.44,
+            646.34368
+          ]
+        }
+      ],
+      "linked_tables": [],
+      "linked_figures": [
+        {
+          "object_id": "F_p005_odl_001",
+          "object_type": "figure",
+          "page": 5,
+          "caption": "",
+          "bbox": [
+            0.0,
+            0.0,
+            559.92,
+            753.36
+          ],
+          "link_reasons": [
+            "layout_proximity"
+          ],
+          "link_confidence": 0.65,
+          "ocr_status": "pending"
+        },
+        {
+          "object_id": "F_p006_odl_001",
+          "object_type": "figure",
+          "page": 6,
+          "caption": "",
+          "bbox": [
+            0.0,
+            0.0,
+            558.0,
+            755.52
+          ],
+          "link_reasons": [
+            "layout_proximity"
+          ],
+          "link_confidence": 0.65,
+          "ocr_status": "pending"
+        }
+      ]
+    },
+    {
+      "chunk_id": "CH0015",
+      "section_title": "第九部分有待研究的问题",
+      "section_path": [
+        "正文",
+        "变应性支气管肺曲霉病诊治专家共识",
+        "第九部分有待研究的问题"
+      ],
+      "source_section_paths": [
+        [
+          "正文",
+          "变应性支气管肺曲霉病诊治专家共识",
+          "第九部分有待研究的问题"
+        ]
+      ],
+      "page_start": 6,
+      "page_end": 6,
+      "page_span": {
+        "start": {
+          "page": 6,
+          "offset": 798
+        },
+        "end": {
+          "page": 6,
+          "offset": 1998
+        }
+      },
+      "text_span": {
+        "start": 7655,
+        "end": 8855
+      },
+      "text": "抗真菌药\n[7]胡红，张丽，余丹阳，等．变应性支气管肺曲霉病七例临床特\n物是ABPA重要的辅助治疗，由于疗程长，药物费用点分析[J]．中华结核和呼吸杂志，2012，35(1)：37\"41．\nDOI：10．3760／cma．j．issn．1001-0939．2012．O1．013．\n高，限制了临床应用，因此需要探索适合我国国情的\n[8]牟艳，叶伶，龚颖，等．血清霉菌特异性IgE阳性支气管哮喘\n抗真菌药物治疗方案。关于抗真菌药物的用量，目患者的I临床及过敏状态分析[J]．中华结核和呼吸杂志，\n前多沿用侵袭性肺曲霉病的推荐剂量；但亦有文献 2013，36(8)：563-566．DOI：10．3760／cma．j．issn．10014)939．\n2013．08．002．\n报道采用较低剂量药物(例如伊曲康唑200m#d 9fAgarwalR，ChakrabartiA，ShahA，eta1．Allergic\n或伏立康唑200～300mg／d)，也可获得相应疗 bronchopulmonaryaspergillosis：reviewofliteratureandproposal\nofnewdiagnosticandclassificationcriteria[J]．ClinExpAllergy，\n效_2。考虑到ABPA抗真菌治疗的疗程和费用问\n2013，43(8)：850—873．DOI：10．1111／cea．12141．\n题，低剂量疗法的优势显而易见，但其临床疗效和潜 [1O]马艳良，张为兵，余兵，等．支气管哮喘患者中变应性支气管\n肺曲霉病的检出及临床特点初步调查[J]．中华结核和呼吸\n在的唑类耐药等问题，仍需进一步研究明确。\n杂志，2011，34(12)：909-913．DOI：10．3760／cma．j．issn．\n志谢为本共识的制定提供宝贵意见的哮喘学组其他专家(按姓名 10014)939．20l1．12．009．\n[11]AgarwalR，AggarwalAN，GuptaD，eta1．Aspergillus\n汉语拼音排序)：陈一强、陈志华、戴元荣、郭雪君、郭禹标、华树成、\nhypersensitivityandallergicbronehopulmonaryaspergillosisin\n黄克武、黄茂、姜淑娟、孔灵菲、雷伟、刘春涛、刘晶、刘荣玉、刘先胜、\npatientswithbronchialasthma：systematicreviewandmeta—\n莫碧文、秦晓群、邱晨、邱忠民、商艳、宋颖芳、苏楠、唐昊、唐华平、 analysis[J]．IntJTubercLungDis，2009，13(8)：936-944．\n万欢英、王彦、昊昌归、向旭东、谢华、张曼、赵丽敏 [12]MaturuVN，AgarwalR．PrevalenceofAspergillus",
+      "text_quality": {
+        "cjk_ratio": 0.3493
+      },
+      "anchors": {
+        "sha1_12": "3f7594b6270a",
+        "head_80": "抗真菌药\n[7]胡红，张丽，余丹阳，等．变应性支气管肺曲霉病七例临床特\n物是ABPA重要的辅助治疗，由于疗程长，药物费用点分析[J]．中华结核和呼吸杂志，201"
+      },
+      "document_core_disease": "变应性支气管肺曲霉病",
+      "document_core_diseases": [
+        "变应性支气管肺曲霉病"
+      ],
+      "metadata": {
+        "document_core_disease": "变应性支气管肺曲霉病",
+        "document_core_diseases": [
+          "变应性支气管肺曲霉病"
+        ],
+        "core_disease_resolution": {
+          "status": "resolved",
+          "source": "llm_title",
+          "core_diseases": [
+            {
+              "name": "变应性支气管肺曲霉病",
+              "title_evidence": "变应性支气管肺曲霉病诊治专家共识",
+              "confidence": 1.0
+            }
+          ],
+          "document_core_diseases": [
+            "变应性支气管肺曲霉病"
+          ],
+          "document_core_disease": "变应性支气管肺曲霉病",
+          "required": true,
+          "pass": true,
+          "model": "qwen3.7-max",
+          "prompt_version": "document_core_disease_v1",
+          "validator_version": "document_core_disease_validator_v1",
+          "cache_hit": false,
+          "cache_key": "e86ff296ebcec56f406b71ef8743f76c1fc5739e291202882ffbf17be2a69a55",
+          "llm_status": "ok",
+          "llm_reason": "",
+          "llm_validated": {
+            "valid": true,
+            "status": "resolved",
+            "core_diseases": [
+              {
+                "name": "变应性支气管肺曲霉病",
+                "title_evidence": "变应性支气管肺曲霉病诊治专家共识",
+                "confidence": 1.0
+              }
+            ],
+            "reason": "标题明确以‘变应性支气管肺曲霉病’为核心疾病主题，‘诊治专家共识’为文档功能词",
+            "reasons": []
+          },
+          "rule_result": {
+            "name": "变应性支气管肺曲霉病",
+            "status": "rule_confirmed",
+            "confidence": 0.98,
+            "source_title": "变应性支气管肺曲霉病诊治专家共识",
+            "cleaned_title": "变应性支气管肺曲霉病诊治专家共识",
+            "removed_suffix": "诊治专家共识",
+            "reason": ""
+          },
+          "quality_reasons": []
+        },
+        "inferred_department": "呼吸内科",
+        "department_inference_status": "ok"
+      },
+      "page_regions": [
+        {
+          "page": 6,
+          "bbox": [
+            24.0,
+            162.76095999999995,
+            509.44,
+            627.58392
+          ]
+        }
+      ],
+      "linked_tables": [],
+      "linked_figures": [
+        {
+          "object_id": "F_p006_odl_001",
+          "object_type": "figure",
+          "page": 6,
+          "caption": "",
+          "bbox": [
+            0.0,
+            0.0,
+            558.0,
+            755.52
+          ],
+          "link_reasons": [
+            "layout_proximity"
+          ],
+          "link_confidence": 0.65,
+          "ocr_status": "pending"
+        }
+      ]
+    },
+    {
+      "chunk_id": "CH0016",
+      "section_title": "第九部分有待研究的问题",
+      "section_path": [
+        "正文",
+        "变应性支气管肺曲霉病诊治专家共识",
+        "第九部分有待研究的问题"
+      ],
+      "source_section_paths": [
+        [
+          "正文",
+          "变应性支气管肺曲霉病诊治专家共识",
+          "第九部分有待研究的问题"
+        ]
+      ],
+      "page_start": 6,
+      "page_end": 6,
+      "page_span": {
+        "start": {
+          "page": 6,
+          "offset": 1998
+        },
+        "end": {
+          "page": 6,
+          "offset": 3182
+        }
+      },
+      "text_span": {
+        "start": 8855,
+        "end": 10039
+      },
+      "text": "sensitization\nandallergicbronchopulmonaryaspergillosisincysticfibrosis：\n本共识制定专家组：\nsystematicreviewandmeta-analysis[J]．ClinExpAllergy，2015，\n顾问：钟南山(广州呼吸疾病研究所一广州医科大学附属第一\n45(12)：1765-1778．DOI：10．1111／cea．12595．\n医院呼吸与危重症医学科)；王辰(中日友好医院呼吸与危 [13]PasteurMC，HelliwellSM，HoughtonSJ，eta1．Aninvestigation\n重症医学科) intocausativefactorsinpatientswithbronchiectasis[J]．AmJ\nRespirCritCareMed，2000，162(4Pt1)：1277—1284．DOI：i0．\n组长：沈华浩(浙江大学医学院附属第二医院呼吸与危重症\n1164／ajrccm．162．4．9906120．\n医学科)；孙永昌(北京大学第三医院呼吸与危重症医学科) [14]AgarwalR，HazarikaB，GuptaD，eta1．Aspergillus\n副组长：林江涛(中日友好医院呼吸与危重症医学科)；周新 hypersensitivityinpatientswithchronicobstructivepulmonary\ndisease：COPDasariskfactorforABPA?[J]．MedMycol，\n(上海交通大学附属第一人民医院呼吸与危重症医学科)；\n2010，8(7)：988-994．DOI：10．3109／13693781003743148．\n王长征(第三军医大学新桥医院呼吸内科)；赖克方(广州呼 115jJinJ，LiuX，SunY．TheprevalenceofincreasedserumIgEand\nAspergillussensitizationinpatientswithCOPDandtheir\n吸疾病研究所一广州医科大学附属第一医院呼吸与危重症医\nassociationwithsymptomsandlungfunction[J]．RespirRes，\n学科)\n2014，15：130．DOI：10．1186／s12931-o14~130-1．\n成员：李靖(广州呼吸疾病研究所一广州医科大学附属第一医 [16]刘晓芳，孙永昌，金建敏，等．慢性阻塞性肺疾病合并变应性\n支气管肺曲霉病三例临床分析[J]．中华结核和呼吸杂志，\n院呼吸与危重症医学科)；金关玲(复旦大学附属中山医院\n2013，36(10)：741-745．DOI：10．3760／cma．j．issn．1001-0939．\n呼吸与危重症医学科)；",
+      "text_quality": {
+        "cjk_ratio": 0.2665
+      },
+      "anchors": {
+        "sha1_12": "5f23c01813a3",
+        "head_80": "sensitization\nandallergicbronchopulmonaryaspergillosisincysticfibrosis：\n本共识制定专家组"
+      },
+      "document_core_disease": "变应性支气管肺曲霉病",
+      "document_core_diseases": [
+        "变应性支气管肺曲霉病"
+      ],
+      "metadata": {
+        "document_core_disease": "变应性支气管肺曲霉病",
+        "document_core_diseases": [
+          "变应性支气管肺曲霉病"
+        ],
+        "core_disease_resolution": {
+          "status": "resolved",
+          "source": "llm_title",
+          "core_diseases": [
+            {
+              "name": "变应性支气管肺曲霉病",
+              "title_evidence": "变应性支气管肺曲霉病诊治专家共识",
+              "confidence": 1.0
+            }
+          ],
+          "document_core_diseases": [
+            "变应性支气管肺曲霉病"
+          ],
+          "document_core_disease": "变应性支气管肺曲霉病",
+          "required": true,
+          "pass": true,
+          "model": "qwen3.7-max",
+          "prompt_version": "document_core_disease_v1",
+          "validator_version": "document_core_disease_validator_v1",
+          "cache_hit": false,
+          "cache_key": "e86ff296ebcec56f406b71ef8743f76c1fc5739e291202882ffbf17be2a69a55",
+          "llm_status": "ok",
+          "llm_reason": "",
+          "llm_validated": {
+            "valid": true,
+            "status": "resolved",
+            "core_diseases": [
+              {
+                "name": "变应性支气管肺曲霉病",
+                "title_evidence": "变应性支气管肺曲霉病诊治专家共识",
+                "confidence": 1.0
+              }
+            ],
+            "reason": "标题明确以‘变应性支气管肺曲霉病’为核心疾病主题，‘诊治专家共识’为文档功能词",
+            "reasons": []
+          },
+          "rule_result": {
+            "name": "变应性支气管肺曲霉病",
+            "status": "rule_confirmed",
+            "confidence": 0.98,
+            "source_title": "变应性支气管肺曲霉病诊治专家共识",
+            "cleaned_title": "变应性支气管肺曲霉病诊治专家共识",
+            "removed_suffix": "诊治专家共识",
+            "reason": ""
+          },
+          "quality_reasons": []
+        },
+        "inferred_department": "呼吸内科",
+        "department_inference_status": "ok"
+      },
+      "page_regions": [
+        {
+          "page": 6,
+          "bbox": [
+            24.0,
+            162.76095999999995,
+            509.44,
+            721.58392
+          ]
+        }
+      ],
+      "linked_tables": [],
+      "linked_figures": [
+        {
+          "object_id": "F_p006_odl_001",
+          "object_type": "figure",
+          "page": 6,
+          "caption": "",
+          "bbox": [
+            0.0,
+            0.0,
+            558.0,
+            755.52
+          ],
+          "link_reasons": [
+            "layout_proximity"
+          ],
+          "link_confidence": 0.65,
+          "ocr_status": "pending"
+        }
+      ]
+    },
+    {
+      "chunk_id": "CH0017",
+      "section_title": "第九部分有待研究的问题",
+      "section_path": [
+        "正文",
+        "变应性支气管肺曲霉病诊治专家共识",
+        "第九部分有待研究的问题"
+      ],
+      "source_section_paths": [
+        [
+          "正文",
+          "变应性支气管肺曲霉病诊治专家共识",
+          "第九部分有待研究的问题"
+        ]
+      ],
+      "page_start": 6,
+      "page_end": 6,
+      "page_span": {
+        "start": {
+          "page": 6,
+          "offset": 3182
+        },
+        "end": {
+          "page": 6,
+          "offset": 3668
+        }
+      },
+      "text_span": {
+        "start": 10039,
+        "end": 10525
+      },
+      "text": "金建敏(首都医科大学附属北京同\n20l3．10．009．\n仁医院呼吸与危重症医学科)；董亮(山东大学齐鲁医院呼 [17]GreenbergerPA，BushRK，DemainJG，eta1Allergic\nbronchopulmonaryaspergillosis[J]．JAllergyClinImmunol\n吸与危重症医学科)；蔡绍曦(南方医科大学南方医院呼吸\nPract，2014，2(6)：703-708．DOI：10．1016／j．jaip．2014．08．\n与危重症医学科)；应颂敏(浙江大学呼吸疾病研究所-浙江\n007．\n大学医学院附属第二医院呼吸与危重症医学科) [18]RosenbergM，PattersonR，MintzerR，eta1．Clinicaland\nimmunologiccriteriaforthediagnosisofallergicbronchopulmonary\n参考文献 aspergillosis[J]．AnnInternMed，1977，86(4)：4O5414．DOI：\n10．7326／伽3-48l9．86-4_405．",
+      "text_quality": {
+        "cjk_ratio": 0.2288
+      },
+      "anchors": {
+        "sha1_12": "67e4937f71fb",
+        "head_80": "金建敏(首都医科大学附属北京同\n20l3．10．009．\n仁医院呼吸与危重症医学科)；董亮(山东大学齐鲁医院呼 [17]GreenbergerPA，BushRK"
+      },
+      "document_core_disease": "变应性支气管肺曲霉病",
+      "document_core_diseases": [
+        "变应性支气管肺曲霉病"
+      ],
+      "metadata": {
+        "document_core_disease": "变应性支气管肺曲霉病",
+        "document_core_diseases": [
+          "变应性支气管肺曲霉病"
+        ],
+        "core_disease_resolution": {
+          "status": "resolved",
+          "source": "llm_title",
+          "core_diseases": [
+            {
+              "name": "变应性支气管肺曲霉病",
+              "title_evidence": "变应性支气管肺曲霉病诊治专家共识",
+              "confidence": 1.0
+            }
+          ],
+          "document_core_diseases": [
+            "变应性支气管肺曲霉病"
+          ],
+          "document_core_disease": "变应性支气管肺曲霉病",
+          "required": true,
+          "pass": true,
+          "model": "qwen3.7-max",
+          "prompt_version": "document_core_disease_v1",
+          "validator_version": "document_core_disease_validator_v1",
+          "cache_hit": false,
+          "cache_key": "e86ff296ebcec56f406b71ef8743f76c1fc5739e291202882ffbf17be2a69a55",
+          "llm_status": "ok",
+          "llm_reason": "",
+          "llm_validated": {
+            "valid": true,
+            "status": "resolved",
+            "core_diseases": [
+              {
+                "name": "变应性支气管肺曲霉病",
+                "title_evidence": "变应性支气管肺曲霉病诊治专家共识",
+                "confidence": 1.0
+              }
+            ],
+            "reason": "标题明确以‘变应性支气管肺曲霉病’为核心疾病主题，‘诊治专家共识’为文档功能词",
+            "reasons": []
+          },
+          "rule_result": {
+            "name": "变应性支气管肺曲霉病",
+            "status": "rule_confirmed",
+            "confidence": 0.98,
+            "source_title": "变应性支气管肺曲霉病诊治专家共识",
+            "cleaned_title": "变应性支气管肺曲霉病诊治专家共识",
+            "removed_suffix": "诊治专家共识",
+            "reason": ""
+          },
+          "quality_reasons": []
+        },
+        "inferred_department": "呼吸内科",
+        "department_inference_status": "ok"
+      },
+      "page_regions": [
+        {
+          "page": 6,
+          "bbox": [
+            24.0,
+            553.7325599999999,
+            509.44,
+            721.58392
+          ]
+        }
+      ],
+      "linked_tables": [],
+      "linked_figures": [
+        {
+          "object_id": "F_p006_odl_001",
+          "object_type": "figure",
+          "page": 6,
+          "caption": "",
+          "bbox": [
+            0.0,
+            0.0,
+            558.0,
+            755.52
+          ],
+          "link_reasons": [
+            "layout_proximity"
+          ],
+          "link_confidence": 0.65,
+          "ocr_status": "pending"
+        }
+      ]
+    }
+  ],
+  "toc_llm_report": {
+    "enabled": true,
+    "mode": "llm_primary_rule_corrected_v1",
+    "primary_source": "llm",
+    "fallback_reason": "",
+    "rule_candidate_count": 13,
+    "llm_candidate_count": 18,
+    "local_accepted_title_count": 18,
+    "final_accepted_title_count": 18,
+    "llm_extract_report": {
+      "enabled": true,
+      "status": "ok",
+      "reason": "",
+      "call_count": 1,
+      "model": "qwen3.7-max",
+      "candidate_count": 18,
+      "rejected_candidate_count": 0,
+      "rejected_candidates": [],
+      "truncated_input": false
+    },
+    "llm_judge_report": {
+      "enabled": false,
+      "status": "not_applicable",
+      "reason": "llm_primary_no_judge"
+    },
+    "level_conflict_count": 13,
+    "repaired_level_jump_count": 0,
+    "correction_count": 0,
+    "orphan_heading_count": 0,
+    "duplicate_heading_count": 0,
+    "hierarchy_validation_pass": true,
+    "hierarchy_quality_reasons": [],
+    "rule_vs_llm_level_agreement_rate": 0.0,
+    "rule_vs_llm_compared_heading_count": 13,
+    "total_pages": 7,
+    "final_toc": [
+      {
+        "title": "变应性支气管肺曲霉病诊治专家共识",
+        "level": 1,
+        "start": 0,
+        "page": 1,
+        "sources": [
+          "llm"
+        ],
+        "evidence_text": "变应性支气管肺曲霉病诊治专家共识",
+        "decision": "accept",
+        "reason": "llm_primary",
+        "confidence": 0.99,
+        "parent_title": "",
+        "path": [
+          "正文",
+          "变应性支气管肺曲霉病诊治专家共识"
+        ],
+        "candidate_levels": {
+          "llm": [
+            1
+          ]
+        },
+        "candidate_parents": {},
+        "level_conflict": false,
+        "warnings": []
+      },
+      {
+        "title": "第一部分流行病学",
+        "level": 2,
+        "start": 484,
+        "page": 1,
+        "sources": [
+          "llm"
+        ],
+        "evidence_text": "第一部分流行病学",
+        "decision": "accept",
+        "reason": "llm_primary",
+        "confidence": 0.98,
+        "parent_title": "变应性支气管肺曲霉病诊治专家共识",
+        "path": [
+          "正文",
+          "变应性支气管肺曲霉病诊治专家共识",
+          "第一部分流行病学"
+        ],
+        "candidate_levels": {
+          "llm": [
+            2
+          ]
+        },
+        "candidate_parents": {
+          "llm": [
+            "变应性支气管肺曲霉病诊治专家共识"
+          ]
+        },
+        "level_conflict": true,
+        "warnings": []
+      },
+      {
+        "title": "第二部分临床表现",
+        "level": 2,
+        "start": 917,
+        "page": 1,
+        "sources": [
+          "llm"
+        ],
+        "evidence_text": "第二部分临床表现",
+        "decision": "accept",
+        "reason": "llm_primary",
+        "confidence": 0.98,
+        "parent_title": "变应性支气管肺曲霉病诊治专家共识",
+        "path": [
+          "正文",
+          "变应性支气管肺曲霉病诊治专家共识",
+          "第二部分临床表现"
+        ],
+        "candidate_levels": {
+          "llm": [
+            2
+          ]
+        },
+        "candidate_parents": {
+          "llm": [
+            "变应性支气管肺曲霉病诊治专家共识"
+          ]
+        },
+        "level_conflict": true,
+        "warnings": []
+      },
+      {
+        "title": "第三部分实验室检查",
+        "level": 2,
+        "start": 1283,
+        "page": 1,
+        "sources": [
+          "llm"
+        ],
+        "evidence_text": "第三部分实验室检查",
+        "decision": "accept",
+        "reason": "llm_primary",
+        "confidence": 0.98,
+        "parent_title": "变应性支气管肺曲霉病诊治专家共识",
+        "path": [
+          "正文",
+          "变应性支气管肺曲霉病诊治专家共识",
+          "第三部分实验室检查"
+        ],
+        "candidate_levels": {
+          "llm": [
+            2
+          ]
+        },
+        "candidate_parents": {
+          "llm": [
+            "变应性支气管肺曲霉病诊治专家共识"
+          ]
+        },
+        "level_conflict": true,
+        "warnings": []
+      },
+      {
+        "title": "皮肤试验",
+        "level": 3,
+        "start": 1293,
+        "page": 1,
+        "sources": [
+          "llm"
+        ],
+        "evidence_text": "皮肤试验\n一 、",
+        "decision": "accept",
+        "reason": "llm_primary",
+        "confidence": 0.95,
+        "parent_title": "第三部分实验室检查",
+        "path": [
+          "正文",
+          "变应性支气管肺曲霉病诊治专家共识",
+          "第三部分实验室检查",
+          "皮肤试验"
+        ],
+        "candidate_levels": {
+          "llm": [
+            3
+          ]
+        },
+        "candidate_parents": {
+          "llm": [
+            "第三部分实验室检查"
+          ]
+        },
+        "level_conflict": false,
+        "warnings": []
+      },
+      {
+        "title": "二、血清学检查",
+        "level": 3,
+        "start": 1543,
+        "page": 1,
+        "sources": [
+          "llm"
+        ],
+        "evidence_text": "二、血清学检查",
+        "decision": "accept",
+        "reason": "llm_primary",
+        "confidence": 0.96,
+        "parent_title": "第三部分实验室检查",
+        "path": [
+          "正文",
+          "变应性支气管肺曲霉病诊治专家共识",
+          "第三部分实验室检查",
+          "二、血清学检查"
+        ],
+        "candidate_levels": {
+          "llm": [
+            3
+          ]
+        },
+        "candidate_parents": {
+          "llm": [
+            "第三部分实验室检查"
+          ]
+        },
+        "level_conflict": true,
+        "warnings": []
+      },
+      {
+        "title": "胸部影像学表现",
+        "level": 3,
+        "start": 2533,
+        "page": 2,
+        "sources": [
+          "llm"
+        ],
+        "evidence_text": "胸部影像学表现\n、",
+        "decision": "accept",
+        "reason": "llm_primary",
+        "confidence": 0.94,
+        "parent_title": "第三部分实验室检查",
+        "path": [
+          "正文",
+          "变应性支气管肺曲霉病诊治专家共识",
+          "第三部分实验室检查",
+          "胸部影像学表现"
+        ],
+        "candidate_levels": {
+          "llm": [
+            3
+          ]
+        },
+        "candidate_parents": {
+          "llm": [
+            "第三部分实验室检查"
+          ]
+        },
+        "level_conflict": false,
+        "warnings": []
+      },
+      {
+        "title": "四、血嗜酸粒细胞计数",
+        "level": 3,
+        "start": 2965,
+        "page": 2,
+        "sources": [
+          "llm"
+        ],
+        "evidence_text": "四、血嗜酸粒细胞计数",
+        "decision": "accept",
+        "reason": "llm_primary",
+        "confidence": 0.96,
+        "parent_title": "第三部分实验室检查",
+        "path": [
+          "正文",
+          "变应性支气管肺曲霉病诊治专家共识",
+          "第三部分实验室检查",
+          "四、血嗜酸粒细胞计数"
+        ],
+        "candidate_levels": {
+          "llm": [
+            3
+          ]
+        },
+        "candidate_parents": {
+          "llm": [
+            "第三部分实验室检查"
+          ]
+        },
+        "level_conflict": true,
+        "warnings": []
+      },
+      {
+        "title": "五、痰液检查",
+        "level": 3,
+        "start": 3122,
+        "page": 2,
+        "sources": [
+          "llm"
+        ],
+        "evidence_text": "五、痰液检查",
+        "decision": "accept",
+        "reason": "llm_primary",
+        "confidence": 0.96,
+        "parent_title": "第三部分实验室检查",
+        "path": [
+          "正文",
+          "变应性支气管肺曲霉病诊治专家共识",
+          "第三部分实验室检查",
+          "五、痰液检查"
+        ],
+        "candidate_levels": {
+          "llm": [
+            3
+          ]
+        },
+        "candidate_parents": {
+          "llm": [
+            "第三部分实验室检查"
+          ]
+        },
+        "level_conflict": true,
+        "warnings": []
+      },
+      {
+        "title": "第五部分自然病史和分期",
+        "level": 2,
+        "start": 3636,
+        "page": 4,
+        "sources": [
+          "llm"
+        ],
+        "evidence_text": "第五部分自然病史和分期",
+        "decision": "accept",
+        "reason": "llm_primary",
+        "confidence": 0.98,
+        "parent_title": "变应性支气管肺曲霉病诊治专家共识",
+        "path": [
+          "正文",
+          "变应性支气管肺曲霉病诊治专家共识",
+          "第五部分自然病史和分期"
+        ],
+        "candidate_levels": {
+          "llm": [
+            2
+          ]
+        },
+        "candidate_parents": {
+          "llm": [
+            "变应性支气管肺曲霉病诊治专家共识"
+          ]
+        },
+        "level_conflict": true,
+        "warnings": []
+      },
+      {
+        "title": "第六部分鉴别诊断",
+        "level": 2,
+        "start": 3892,
+        "page": 4,
+        "sources": [
+          "llm"
+        ],
+        "evidence_text": "第六部分鉴别诊断",
+        "decision": "accept",
+        "reason": "llm_primary",
+        "confidence": 0.98,
+        "parent_title": "变应性支气管肺曲霉病诊治专家共识",
+        "path": [
+          "正文",
+          "变应性支气管肺曲霉病诊治专家共识",
+          "第六部分鉴别诊断"
+        ],
+        "candidate_levels": {
+          "llm": [
+            2
+          ]
+        },
+        "candidate_parents": {
+          "llm": [
+            "变应性支气管肺曲霉病诊治专家共识"
+          ]
+        },
+        "level_conflict": true,
+        "warnings": []
+      },
+      {
+        "title": "第七部分治疗",
+        "level": 2,
+        "start": 4354,
+        "page": 4,
+        "sources": [
+          "llm"
+        ],
+        "evidence_text": "第七部分治疗",
+        "decision": "accept",
+        "reason": "llm_primary",
+        "confidence": 0.98,
+        "parent_title": "变应性支气管肺曲霉病诊治专家共识",
+        "path": [
+          "正文",
+          "变应性支气管肺曲霉病诊治专家共识",
+          "第七部分治疗"
+        ],
+        "candidate_levels": {
+          "llm": [
+            2
+          ]
+        },
+        "candidate_parents": {
+          "llm": [
+            "变应性支气管肺曲霉病诊治专家共识"
+          ]
+        },
+        "level_conflict": true,
+        "warnings": []
+      },
+      {
+        "title": "避免变应原接触",
+        "level": 3,
+        "start": 4448,
+        "page": 4,
+        "sources": [
+          "llm"
+        ],
+        "evidence_text": "避免变应原接触\n一 、",
+        "decision": "accept",
+        "reason": "llm_primary",
+        "confidence": 0.95,
+        "parent_title": "第七部分治疗",
+        "path": [
+          "正文",
+          "变应性支气管肺曲霉病诊治专家共识",
+          "第七部分治疗",
+          "避免变应原接触"
+        ],
+        "candidate_levels": {
+          "llm": [
+            3
+          ]
+        },
+        "candidate_parents": {
+          "llm": [
+            "第七部分治疗"
+          ]
+        },
+        "level_conflict": false,
+        "warnings": []
+      },
+      {
+        "title": "二、激素",
+        "level": 3,
+        "start": 4509,
+        "page": 4,
+        "sources": [
+          "llm"
+        ],
+        "evidence_text": "二、激素",
+        "decision": "accept",
+        "reason": "llm_primary",
+        "confidence": 0.96,
+        "parent_title": "第七部分治疗",
+        "path": [
+          "正文",
+          "变应性支气管肺曲霉病诊治专家共识",
+          "第七部分治疗",
+          "二、激素"
+        ],
+        "candidate_levels": {
+          "llm": [
+            3
+          ]
+        },
+        "candidate_parents": {
+          "llm": [
+            "第七部分治疗"
+          ]
+        },
+        "level_conflict": true,
+        "warnings": []
+      },
+      {
+        "title": "三、抗真菌药物",
+        "level": 3,
+        "start": 4966,
+        "page": 4,
+        "sources": [
+          "llm"
+        ],
+        "evidence_text": "三、抗真菌药物",
+        "decision": "accept",
+        "reason": "llm_primary",
+        "confidence": 0.96,
+        "parent_title": "第七部分治疗",
+        "path": [
+          "正文",
+          "变应性支气管肺曲霉病诊治专家共识",
+          "第七部分治疗",
+          "三、抗真菌药物"
+        ],
+        "candidate_levels": {
+          "llm": [
+            3
+          ]
+        },
+        "candidate_parents": {
+          "llm": [
+            "第七部分治疗"
+          ]
+        },
+        "level_conflict": true,
+        "warnings": []
+      },
+      {
+        "title": "【Ju、It；．(ig1~J,j物",
+        "level": 3,
+        "start": 5743,
+        "page": 5,
+        "sources": [
+          "llm"
+        ],
+        "evidence_text": "【Ju、It；．(ig1~J,j物",
+        "decision": "accept",
+        "reason": "llm_primary",
+        "confidence": 0.85,
+        "parent_title": "第七部分治疗",
+        "path": [
+          "正文",
+          "变应性支气管肺曲霉病诊治专家共识",
+          "第七部分治疗",
+          "【Ju、It；．(ig1~J,j物"
+        ],
+        "candidate_levels": {
+          "llm": [
+            3
+          ]
+        },
+        "candidate_parents": {
+          "llm": [
+            "第七部分治疗"
+          ]
+        },
+        "level_conflict": false,
+        "warnings": []
+      },
+      {
+        "title": "第八部分病情监测和预后",
+        "level": 2,
+        "start": 5885,
+        "page": 5,
+        "sources": [
+          "llm"
+        ],
+        "evidence_text": "第八部分病情监测和预后",
+        "decision": "accept",
+        "reason": "llm_primary",
+        "confidence": 0.98,
+        "parent_title": "变应性支气管肺曲霉病诊治专家共识",
+        "path": [
+          "正文",
+          "变应性支气管肺曲霉病诊治专家共识",
+          "第八部分病情监测和预后"
+        ],
+        "candidate_levels": {
+          "llm": [
+            2
+          ]
+        },
+        "candidate_parents": {
+          "llm": [
+            "变应性支气管肺曲霉病诊治专家共识"
+          ]
+        },
+        "level_conflict": true,
+        "warnings": []
+      },
+      {
+        "title": "第九部分有待研究的问题",
+        "level": 2,
+        "start": 6472,
+        "page": 5,
+        "sources": [
+          "llm"
+        ],
+        "evidence_text": "第九部分有待研究的问题",
+        "decision": "accept",
+        "reason": "llm_primary",
+        "confidence": 0.98,
+        "parent_title": "变应性支气管肺曲霉病诊治专家共识",
+        "path": [
+          "正文",
+          "变应性支气管肺曲霉病诊治专家共识",
+          "第九部分有待研究的问题"
+        ],
+        "candidate_levels": {
+          "llm": [
+            2
+          ]
+        },
+        "candidate_parents": {
+          "llm": [
+            "变应性支气管肺曲霉病诊治专家共识"
+          ]
+        },
+        "level_conflict": true,
+        "warnings": []
+      }
+    ],
+    "chunk_section_path_consistency_pass": true,
+    "chunk_section_path_mismatch_count": 0,
+    "chunk_section_path_mismatches": [],
+    "chunk_section_boundary_crossing_count": 0,
+    "chunk_section_boundary_crossings": []
+  },
+  "document_core_disease": "变应性支气管肺曲霉病",
+  "document_core_diseases": [
+    "变应性支气管肺曲霉病"
+  ],
+  "metadata": {
+    "document_core_disease": "变应性支气管肺曲霉病",
+    "document_core_diseases": [
+      "变应性支气管肺曲霉病"
+    ],
+    "core_disease_resolution_required": true,
+    "core_disease_resolution": {
+      "status": "resolved",
+      "source": "llm_title",
+      "core_diseases": [
+        {
+          "name": "变应性支气管肺曲霉病",
+          "title_evidence": "变应性支气管肺曲霉病诊治专家共识",
+          "confidence": 1.0
+        }
+      ],
+      "document_core_diseases": [
+        "变应性支气管肺曲霉病"
+      ],
+      "document_core_disease": "变应性支气管肺曲霉病",
+      "required": true,
+      "pass": true,
+      "model": "qwen3.7-max",
+      "prompt_version": "document_core_disease_v1",
+      "validator_version": "document_core_disease_validator_v1",
+      "cache_hit": false,
+      "cache_key": "e86ff296ebcec56f406b71ef8743f76c1fc5739e291202882ffbf17be2a69a55",
+      "llm_status": "ok",
+      "llm_reason": "",
+      "llm_validated": {
+        "valid": true,
+        "status": "resolved",
+        "core_diseases": [
+          {
+            "name": "变应性支气管肺曲霉病",
+            "title_evidence": "变应性支气管肺曲霉病诊治专家共识",
+            "confidence": 1.0
+          }
+        ],
+        "reason": "标题明确以‘变应性支气管肺曲霉病’为核心疾病主题，‘诊治专家共识’为文档功能词",
+        "reasons": []
+      },
+      "rule_result": {
+        "name": "变应性支气管肺曲霉病",
+        "status": "rule_confirmed",
+        "confidence": 0.98,
+        "source_title": "变应性支气管肺曲霉病诊治专家共识",
+        "cleaned_title": "变应性支气管肺曲霉病诊治专家共识",
+        "removed_suffix": "诊治专家共识",
+        "reason": ""
+      },
+      "quality_reasons": []
+    },
+    "inferred_department": "呼吸内科",
+    "department_inference": {
+      "inferred_department": "呼吸内科",
+      "status": "ok",
+      "source": "department_inference",
+      "candidates": [
+        "产科",
+        "内分泌科",
+        "口腔科",
+        "呼吸内科",
+        "妇科",
+        "康复科",
+        "心内科",
+        "心血管外科",
+        "急诊科",
+        "感染科",
+        "放射治疗科",
+        "整形外科",
+        "新生儿科",
+        "普通外科",
+        "泌尿外科",
+        "消化内科",
+        "烧伤科",
+        "皮肤科",
+        "眼科",
+        "神经内科",
+        "神经外科",
+        "精神科",
+        "耳鼻喉科",
+        "职业病与中毒",
+        "肾内科",
+        "肿瘤科",
+        "胸外科",
+        "血液科",
+        "骨科",
+        "麻醉科"
+      ],
+      "model": "qwen3.7-max"
+    }
+  },
+  "text_quality_report": {
+    "stage": "parsed_pdf_text_quality",
+    "enabled": true,
+    "status": "pass",
+    "skip": false,
+    "reasons": [],
+    "total_chars": 14037,
+    "cjk_chars": 5525,
+    "ascii_letter_chars": 5172,
+    "digit_chars": 1447,
+    "readable_chars": 13510,
+    "replacement_chars": 0,
+    "question_mark_chars": 2,
+    "control_chars": 0,
+    "symbol_chars": 53,
+    "private_use_chars": 0,
+    "mojibake_marker_chars": 34,
+    "cid_marker_count": 0,
+    "cid_marker_chars": 0,
+    "document_hint_cjk_chars": 16,
+    "cjk_ratio": 0.3936,
+    "ascii_letter_ratio": 0.3685,
+    "readable_ratio": 0.9625,
+    "weird_ratio": 0.0038,
+    "mojibake_ratio": 0.0024,
+    "cid_marker_ratio": 0.0,
+    "thresholds": {
+      "min_text_chars": 80,
+      "max_cjk_ratio": 0.02,
+      "min_ascii_letter_ratio": 0.2,
+      "min_readable_ratio": 0.55,
+      "max_weird_ratio": 0.35,
+      "max_mojibake_ratio": 0.08,
+      "max_cid_marker_ratio": 0.01,
+      "max_cid_marker_count": 20,
+      "cjk_title_min_chars": 2,
+      "min_cjk_ratio_for_cjk_title": 0.01
+    }
+  },
+  "semantic_section_llm_report": {
+    "enabled": true,
+    "status": "failed",
+    "mode": "span_ops_v1",
+    "noise_fragments": [
+      {
+        "label": "噪声片段",
+        "start": 980,
+        "end": 1280,
+        "excerpt": "人最高 。由于临床对该病认\n识不足，常被漏诊，往往发展至晚期出现不可逆性结\n构改变才得以确诊。\nABPA的临床表现多种多样，缺乏特异性，主要\n表现为咳嗽、咳痰、喘息，还可见低热、消瘦、乏力、胸\n痛等。咳棕褐色黏冻样痰栓为特征性表现。存在支\n气管扩张时，可有不同程度的咯血。少数患者可以\n没有明显症状。急性加重时出现咳嗽、喘息、咯血、\n咳大量黄黏痰等。缓解期上述症状可消失或明显\n减轻。\n体检时肺部可闻",
+        "reason": "通信作者、邮箱、期刊期号及栏目名称等无效版面信息"
+      },
+      {
+        "label": "噪声片段",
+        "start": 2980,
+        "end": 3050,
+        "excerpt": "病。\n四、血嗜酸粒细胞计数\nABPA患者常有外周嗜酸粒细胞计数升高，\n但对于诊断ABPA的敏感性和特异性不高 ；由于\n外周m嗜酸粒细胞与肺部",
+        "reason": "页眉页脚英文期刊信息"
+      },
+      {
+        "label": "噪声片段",
+        "start": 5900,
+        "end": 6000,
+        "excerpt": "f1干口fi-：\n院次数，改：浮肺功能，减少I『Jj激 _i=fIj 。。\n报道料多个例验小样小究，【l前暂推\n使川\n第八部分病情监测和预后\nAI{PA 牲受治后，最初铒6～8剧随\n1次．估状、ifi",
+        "reason": "乱码页眉信息"
+      },
+      {
+        "label": "噪声片段",
+        "start": 8500,
+        "end": 11029,
+        "excerpt": "60／cma．j．issn．\n志谢为本共识的制定提供宝贵意见的哮喘学组其他专家(按姓名 10014)939．20l1．12．009．\n[11]AgarwalR，AggarwalAN，GuptaD，eta1．Aspergillus\n汉语拼音排序)：陈一强、陈志华、戴元荣、郭雪君、郭禹标、华树成、\nhypersensitivityandallergicbronehopulmonaryaspergill",
+        "reason": "致谢、专家组成员名单及参考文献列表"
+      },
+      {
+        "label": "噪声片段",
+        "start": 11049,
+        "end": 14760,
+        "excerpt": "arehinte．1986．OO36O170l30020．\n[20]SchwartzHJ，GreenbergerPA．Theprevalenceofallergic\nbronchopulmonaryaspergillosisinpatientswithasthma，\ndeterminedbyserologicandradiologiccriteriainpatientsatrisk\nfJ]．JLa",
+        "reason": "参考文献列表、广告及购买咨询信息"
+      }
+    ],
+    "reason": "noise_spans 区间疑似截断正文字符: [980, 1280)。"
+  },
+  "preparse_report": {
+    "parser": "opendataloader",
+    "json_path": "data\\processed_pages\\opendataloader\\变应性支气管肺曲霉病诊治专家共识\\input.json",
+    "total_elements": 305,
+    "total_objects": 7,
+    "page_count": 7,
+    "text_source": "pdfplumber",
+    "structure_source": "opendataloader",
+    "opendataloader_page_count": 7
+  },
+  "figure_table_objects": [
+    {
+      "object_id": "F_p001_odl_001",
+      "object_type": "figure",
+      "page": 1,
+      "caption": "",
+      "body": [],
+      "body_bbox": [],
+      "bbox": [
+        0.0,
+        0.0,
+        552.96,
+        751.92
+      ],
+      "source": "opendataloader",
+      "ocr_status": "pending"
+    },
+    {
+      "object_id": "F_p002_odl_001",
+      "object_type": "figure",
+      "page": 2,
+      "caption": "",
+      "body": [],
+      "body_bbox": [],
+      "bbox": [
+        0.0,
+        0.0,
+        564.96,
+        757.44
+      ],
+      "source": "opendataloader",
+      "ocr_status": "pending"
+    },
+    {
+      "object_id": "F_p003_odl_001",
+      "object_type": "figure",
+      "page": 3,
+      "caption": "",
+      "body": [],
+      "body_bbox": [],
+      "bbox": [
+        0.0,
+        0.0,
+        564.24,
+        756.48
+      ],
+      "source": "opendataloader",
+      "ocr_status": "pending"
+    },
+    {
+      "object_id": "F_p004_odl_001",
+      "object_type": "figure",
+      "page": 4,
+      "caption": "",
+      "body": [],
+      "body_bbox": [],
+      "bbox": [
+        0.0,
+        0.0,
+        562.32,
+        755.28
+      ],
+      "source": "opendataloader",
+      "ocr_status": "pending"
+    },
+    {
+      "object_id": "F_p005_odl_001",
+      "object_type": "figure",
+      "page": 5,
+      "caption": "",
+      "body": [],
+      "body_bbox": [],
+      "bbox": [
+        0.0,
+        0.0,
+        559.92,
+        753.36
+      ],
+      "source": "opendataloader",
+      "ocr_status": "pending"
+    },
+    {
+      "object_id": "F_p006_odl_001",
+      "object_type": "figure",
+      "page": 6,
+      "caption": "",
+      "body": [],
+      "body_bbox": [],
+      "bbox": [
+        0.0,
+        0.0,
+        558.0,
+        755.52
+      ],
+      "source": "opendataloader",
+      "ocr_status": "pending"
+    },
+    {
+      "object_id": "F_p007_odl_001",
+      "object_type": "figure",
+      "page": 7,
+      "caption": "",
+      "body": [],
+      "body_bbox": [],
+      "bbox": [
+        0.0,
+        0.0,
+        552.96,
+        751.92
+      ],
+      "source": "opendataloader",
+      "ocr_status": "pending"
+    }
+  ]
+}

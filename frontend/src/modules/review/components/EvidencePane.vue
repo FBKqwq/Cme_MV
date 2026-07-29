@@ -1,9 +1,5 @@
 <script setup lang="ts">
 import {
-  AlertCircle,
-  ArrowRight,
-  Check,
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
@@ -12,8 +8,9 @@ import {
   Plus,
 } from "lucide-vue-next";
 import type { ChunkDetail, ChunkSummary, EntityRecord } from "../types";
+import { computed } from "vue";
 
-defineProps<{
+const props = defineProps<{
   detail: ChunkDetail | null;
   detailLoading: boolean;
   currentSummary?: ChunkSummary;
@@ -34,8 +31,20 @@ const emit = defineEmits<{
   clearEntitySelection: [];
   captureSelection: [event: MouseEvent];
   createFromSelection: [];
-  approveNext: [];
+  skip: [];
 }>();
+
+const acceptedCount = computed(() => {
+  return props.detail
+    ? props.detail.entities.filter((e) => !e._review?.deleted && e.status === "accepted").length
+    : 0;
+});
+
+const pendingCount = computed(() => {
+  return props.detail
+    ? props.detail.entities.filter((e) => e._review?.deleted || e.status !== "accepted").length
+    : 0;
+});
 </script>
 
 <template>
@@ -97,6 +106,14 @@ const emit = defineEmits<{
           >
             <ChevronRight :size="18" />
           </button>
+          <button
+            class="button quiet compact"
+            type="button"
+            :disabled="activeChunkIndex >= totalChunks - 1"
+            @click="emit('skip')"
+          >
+            暂存并跳过
+          </button>
         </div>
       </div>
       <article
@@ -157,17 +174,6 @@ const emit = defineEmits<{
 
       <footer class="review-actionbar">
         <div class="actionbar-status">
-          <span
-            class="status-orb"
-            :class="{
-              approved: detail.review.status === 'approved',
-              issue: detail.review.issue_count > 0,
-            }"
-          >
-            <AlertCircle v-if="detail.review.issue_count" :size="15" />
-            <Check v-else-if="detail.review.status === 'approved'" :size="15" />
-            <CheckCircle2 v-else :size="15" />
-          </span>
           <div>
             <strong v-if="detail.review.issue_count">
               {{ detail.review.issue_count }} 项阻塞问题
@@ -175,25 +181,9 @@ const emit = defineEmits<{
             <strong v-else-if="detail.review.status === 'approved'">当前 Chunk 已通过</strong>
             <strong v-else>当前 Chunk 待复验</strong>
             <span>
-              {{ detail.entities.length }} 个实体 ·
-              {{ detail.relationships.length }} 条关系
+              {{ acceptedCount }} 个已接受 · {{ pendingCount }} 个待复验
             </span>
           </div>
-        </div>
-        <div class="actionbar-actions">
-          <button
-            class="button quiet"
-            type="button"
-            :disabled="activeChunkIndex >= totalChunks - 1"
-            @click="emit('relative', 1)"
-          >
-            暂存并跳过
-          </button>
-          <button class="button approve" type="button" @click="emit('approveNext')">
-            <CheckCircle2 :size="17" />
-            通过并进入下一 Chunk
-            <ArrowRight :size="16" />
-          </button>
         </div>
       </footer>
     </template>

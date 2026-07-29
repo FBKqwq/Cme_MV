@@ -911,11 +911,11 @@ onBeforeUnmount(() => {
         :total-chunks="chunks.length"
         @open-pdf="pdfOpen = true"
         @relative="goRelative"
+        @skip="goRelative(1)"
         @select-entity="selectHighlightedEntity"
         @clear-entity-selection="selectedEntityId = ''"
         @capture-selection="captureSelection"
         @create-from-selection="openCreateEntity()"
-        @approve-next="approveAndNext"
       />
 
       <div
