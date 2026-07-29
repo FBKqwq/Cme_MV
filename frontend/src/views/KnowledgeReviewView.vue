@@ -256,8 +256,7 @@ async function loadChunk(chunkId: string) {
     detail.value = result;
     entityDraftDirty.value = false;
     if (task.value) task.value.version = detail.value.version;
-    selectedEntityId.value =
-      detail.value.entities.find((item) => !item._review.deleted)?.entity_id || "";
+    selectedEntityId.value = "";
     selectedRelationId.value =
       detail.value.relationships.find((item) => !item._review.deleted)
         ?.relation_id || "";
