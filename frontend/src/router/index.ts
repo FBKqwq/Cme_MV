@@ -6,11 +6,6 @@ import {
 
 const diagnosisRoutes: RouteRecordRaw[] = [
     {
-        path: '',
-        name: 'home',
-        component: () => import('../views/HomeView.vue'),
-    },
-    {
         path: '/cases/new',
         name: 'case-create',
         component: () => import('../views/CaseCreateView.vue'),
@@ -19,11 +14,6 @@ const diagnosisRoutes: RouteRecordRaw[] = [
         path: '/prediction',
         name: 'prediction',
         component: () => import('../views/PredictionView.vue'),
-    },
-    {
-        path: '/cases/history',
-        name: 'case-history',
-        component: () => import('../views/CaseHistoryView.vue'),
     },
     {
         path: '/cases/:caseId',
@@ -47,6 +37,9 @@ const routes: RouteRecordRaw[] = [
     {
         path: '/',
         component: () => import('../layouts/DiagnosisLayout.vue'),
+        redirect: {
+            name: 'case-create',
+        },
         children: diagnosisRoutes,
     },
     {
@@ -56,7 +49,9 @@ const routes: RouteRecordRaw[] = [
     },
     {
         path: '/:pathMatch(.*)*',
-        redirect: '/',
+        redirect: {
+            name: 'case-create',
+        },
     },
 ]
 

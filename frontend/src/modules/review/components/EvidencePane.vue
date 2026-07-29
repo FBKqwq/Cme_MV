@@ -8,7 +8,6 @@ import {
   ChevronRight,
   ExternalLink,
   FileText,
-  Highlighter,
   LoaderCircle,
   Plus,
 } from "lucide-vue-next";
