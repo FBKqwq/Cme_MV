@@ -1,5 +1,10 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import {
+  AlertCircle,
+  ArrowRight,
+  Check,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
@@ -8,13 +13,18 @@ import {
   Plus,
 } from "lucide-vue-next";
 import type { ChunkDetail, ChunkSummary, EntityRecord } from "../types";
-import { computed } from "vue";
+
+interface HighlightSegment {
+  text: string;
+  entity?: EntityRecord;
+  evidence?: boolean;
+}
 
 const props = defineProps<{
   detail: ChunkDetail | null;
   detailLoading: boolean;
   currentSummary?: ChunkSummary;
-  highlightedSegments: Array<{ text: string; entity?: EntityRecord }>;
+  highlightedSegments: HighlightSegment[];
   selectedEntityId: string;
   selectedEvidence: string;
   selectedEvidencePosition: { x: number; y: number };
@@ -24,6 +34,25 @@ const props = defineProps<{
   totalChunks: number;
 }>();
 
+const highlightGroups = computed(() => {
+  const groups: Array<{
+    evidence: boolean;
+    segments: HighlightSegment[];
+  }> = [];
+
+  for (const segment of props.highlightedSegments) {
+    const evidence = Boolean(segment.evidence);
+    const current = groups[groups.length - 1];
+    if (current && current.evidence === evidence) {
+      current.segments.push(segment);
+    } else {
+      groups.push({ evidence, segments: [segment] });
+    }
+  }
+
+  return groups;
+});
+
 const emit = defineEmits<{
   openPdf: [];
   relative: [offset: -1 | 1];
@@ -31,20 +60,8 @@ const emit = defineEmits<{
   clearEntitySelection: [];
   captureSelection: [event: MouseEvent];
   createFromSelection: [];
-  skip: [];
+  approveNext: [];
 }>();
-
-const acceptedCount = computed(() => {
-  return props.detail
-    ? props.detail.entities.filter((e) => !e._review?.deleted && e.status === "accepted").length
-    : 0;
-});
-
-const pendingCount = computed(() => {
-  return props.detail
-    ? props.detail.entities.filter((e) => e._review?.deleted || e.status !== "accepted").length
-    : 0;
-});
 </script>
 
 <template>
@@ -106,14 +123,6 @@ const pendingCount = computed(() => {
           >
             <ChevronRight :size="18" />
           </button>
-          <button
-            class="button quiet compact"
-            type="button"
-            :disabled="activeChunkIndex >= totalChunks - 1"
-            @click="emit('skip')"
-          >
-            暂存并跳过
-          </button>
         </div>
       </div>
       <article
@@ -124,35 +133,45 @@ const pendingCount = computed(() => {
       >
         <p class="evidence-text">
           <template
-            v-for="(segment, index) in highlightedSegments"
-            :key="`${index}-${segment.text.slice(0, 12)}`"
+            v-for="(group, groupIndex) in highlightGroups"
+            :key="`${groupIndex}-${group.segments[0]?.text.slice(0, 12)}`"
           >
-            <button
-              v-if="segment.entity"
-              class="entity-highlight"
-              :class="[
-                `type-${segment.entity.entity_type}`,
-                {
-                  active: selectedEntityId === segment.entity.entity_id,
-                  modified: segment.entity._review.modified,
-                  accepted:
-                    !segment.entity._review.deleted &&
-                    segment.entity.status === 'accepted',
-                  rejected:
-                    segment.entity._review.deleted ||
-                    segment.entity.status === 'rejected',
-                  review:
-                    !segment.entity._review.deleted &&
-                    segment.entity.status !== 'accepted' &&
-                    segment.entity.status !== 'rejected',
-                },
-              ]"
-              type="button"
-              @click.stop="emit('selectEntity', segment.entity)"
+            <span
+              class="highlight-group"
+              :class="{ 'evidence-range': group.evidence }"
             >
-              {{ segment.text }}
-            </button>
-            <span v-else>{{ segment.text }}</span>
+              <template
+                v-for="(segment, segmentIndex) in group.segments"
+                :key="`${segmentIndex}-${segment.text.slice(0, 12)}`"
+              >
+                <button
+                  v-if="segment.entity"
+                  class="entity-highlight"
+                  :class="[
+                    `type-${segment.entity.entity_type}`,
+                    {
+                      active: selectedEntityId === segment.entity.entity_id,
+                      modified: segment.entity._review.modified,
+                      accepted:
+                        !segment.entity._review.deleted &&
+                        segment.entity.status === 'accepted',
+                      rejected:
+                        segment.entity._review.deleted ||
+                        segment.entity.status === 'rejected',
+                      review:
+                        !segment.entity._review.deleted &&
+                        segment.entity.status !== 'accepted' &&
+                        segment.entity.status !== 'rejected',
+                    },
+                  ]"
+                  type="button"
+                  @click.stop="emit('selectEntity', segment.entity)"
+                >
+                  {{ segment.text }}
+                </button>
+                <span v-else>{{ segment.text }}</span>
+              </template>
+            </span>
           </template>
         </p>
       </article>
@@ -174,6 +193,17 @@ const pendingCount = computed(() => {
 
       <footer class="review-actionbar">
         <div class="actionbar-status">
+          <span
+            class="status-orb"
+            :class="{
+              approved: detail.review.status === 'approved',
+              issue: detail.review.issue_count > 0,
+            }"
+          >
+            <AlertCircle v-if="detail.review.issue_count" :size="15" />
+            <Check v-else-if="detail.review.status === 'approved'" :size="15" />
+            <CheckCircle2 v-else :size="15" />
+          </span>
           <div>
             <strong v-if="detail.review.issue_count">
               {{ detail.review.issue_count }} 项阻塞问题
@@ -181,9 +211,25 @@ const pendingCount = computed(() => {
             <strong v-else-if="detail.review.status === 'approved'">当前 Chunk 已通过</strong>
             <strong v-else>当前 Chunk 待复验</strong>
             <span>
-              {{ acceptedCount }} 个已接受 · {{ pendingCount }} 个待复验
+              {{ detail.entities.length }} 个实体 ·
+              {{ detail.relationships.length }} 条关系
             </span>
           </div>
+        </div>
+        <div class="actionbar-actions">
+          <button
+            class="button quiet"
+            type="button"
+            :disabled="activeChunkIndex >= totalChunks - 1"
+            @click="emit('relative', 1)"
+          >
+            暂存并跳过
+          </button>
+          <button class="button approve" type="button" @click="emit('approveNext')">
+            <CheckCircle2 :size="17" />
+            通过并进入下一 Chunk
+            <ArrowRight :size="16" />
+          </button>
         </div>
       </footer>
     </template>
@@ -327,8 +373,27 @@ const pendingCount = computed(() => {
   word-break: break-word;
 }
 
+.highlight-group {
+  display: contents;
+}
+
+.highlight-group.evidence-range {
+  display: inline;
+  padding: 1px 2px;
+  border: 1px dashed rgba(217, 119, 6, 0.7);
+  border-radius: 3px;
+  background: rgba(250, 204, 21, 0.14);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
 .entity-highlight {
   --highlight-border: #d97706;
+  --highlight-accent: #5964df;
+  --highlight-bg: rgba(105, 116, 226, 0.12);
+  --highlight-hover-bg: rgba(89, 100, 223, 0.2);
+  --highlight-active-bg: rgba(89, 100, 223, 0.34);
+  --highlight-active-text: #1f2ca5;
   position: relative;
   display: inline;
   margin: 0;
@@ -337,7 +402,7 @@ const pendingCount = computed(() => {
   color: inherit;
   border: 0;
   border-radius: 4px;
-  background: rgba(105, 116, 226, 0.12);
+  background: var(--highlight-bg);
   box-shadow:
     inset 0 0 0 1px color-mix(in srgb, var(--highlight-border) 58%, transparent),
     inset 0 -1px 0 var(--highlight-border);
@@ -371,23 +436,68 @@ const pendingCount = computed(() => {
 }
 
 .entity-highlight.modified,
-.entity-highlight.type-treatments,
-.entity-highlight.type-plans {
-  background: rgba(21, 159, 145, 0.14);
+.entity-highlight.type-treatments {
+  --highlight-accent: #16a34a;
+  --highlight-bg: rgba(34, 197, 94, 0.13);
+  --highlight-hover-bg: rgba(34, 197, 94, 0.21);
+  --highlight-active-bg: rgba(34, 197, 94, 0.29);
+  --highlight-active-text: #166534;
 }
 
-.entity-highlight.type-symptoms,
+.entity-highlight.type-plans {
+  --highlight-accent: #0891b2;
+  --highlight-bg: rgba(6, 182, 212, 0.13);
+  --highlight-hover-bg: rgba(6, 182, 212, 0.21);
+  --highlight-active-bg: rgba(6, 182, 212, 0.29);
+  --highlight-active-text: #0e7490;
+}
+
+.entity-highlight.type-diseases {
+  --highlight-accent: #dc2626;
+  --highlight-bg: rgba(239, 68, 68, 0.11);
+  --highlight-hover-bg: rgba(239, 68, 68, 0.18);
+  --highlight-active-bg: rgba(239, 68, 68, 0.26);
+  --highlight-active-text: #b91c1c;
+}
+
+.entity-highlight.type-symptoms {
+  --highlight-accent: #2563eb;
+  --highlight-bg: rgba(78, 132, 214, 0.13);
+  --highlight-hover-bg: rgba(59, 130, 246, 0.21);
+  --highlight-active-bg: rgba(59, 130, 246, 0.3);
+  --highlight-active-text: #1d4ed8;
+}
+
 .entity-highlight.type-sub_diseases {
-  background: rgba(78, 132, 214, 0.13);
+  --highlight-accent: #ea580c;
+  --highlight-bg: rgba(249, 115, 22, 0.15);
+  --highlight-hover-bg: rgba(249, 115, 22, 0.23);
+  --highlight-active-bg: rgba(249, 115, 22, 0.32);
+  --highlight-active-text: #c2410c;
 }
 
 .entity-highlight.type-tests {
-  background: rgba(181, 121, 38, 0.15);
+  --highlight-accent: #db2777;
+  --highlight-bg: rgba(236, 72, 153, 0.12);
+  --highlight-hover-bg: rgba(236, 72, 153, 0.2);
+  --highlight-active-bg: rgba(236, 72, 153, 0.28);
+  --highlight-active-text: #be185d;
 }
 
-.entity-highlight.type-etiologies,
+.entity-highlight.type-etiologies {
+  --highlight-accent: #ca8a04;
+  --highlight-bg: rgba(234, 179, 8, 0.13);
+  --highlight-hover-bg: rgba(234, 179, 8, 0.21);
+  --highlight-active-bg: rgba(234, 179, 8, 0.29);
+  --highlight-active-text: #a16207;
+}
+
 .entity-highlight.type-pathogeneses {
-  background: rgba(156, 98, 190, 0.13);
+  --highlight-accent: #9333ea;
+  --highlight-bg: rgba(168, 85, 247, 0.12);
+  --highlight-hover-bg: rgba(168, 85, 247, 0.2);
+  --highlight-active-bg: rgba(168, 85, 247, 0.28);
+  --highlight-active-text: #7e22ce;
 }
 
 .evidence-reader.has-entity-selection
@@ -397,25 +507,25 @@ const pendingCount = computed(() => {
 }
 
 .entity-highlight:hover {
-  color: #2734a7;
-  background: rgba(89, 100, 223, 0.2);
+  color: var(--highlight-active-text);
+  background: var(--highlight-hover-bg);
   box-shadow:
     inset 0 0 0 1px var(--highlight-border),
     inset 0 -2px 0 var(--highlight-border),
-    0 0 0 2px rgba(89, 100, 223, 0.12);
+    0 0 0 2px color-mix(in srgb, var(--highlight-accent) 14%, transparent);
 }
 
 .entity-highlight.active {
-  color: #1f2ca5;
-  background: rgba(89, 100, 223, 0.34);
+  color: var(--highlight-active-text);
+  background: var(--highlight-active-bg);
   box-shadow:
     inset 0 0 0 1px var(--highlight-border),
     inset 0 -2px 0 var(--highlight-border),
-    0 0 0 3px rgba(89, 100, 223, 0.2);
+    0 0 0 3px color-mix(in srgb, var(--highlight-accent) 20%, transparent);
 }
 
 .entity-highlight:focus-visible {
-  outline: 2px solid #4f5bd5;
+  outline: 2px solid var(--highlight-accent);
   outline-offset: 2px;
 }
 

@@ -3,6 +3,7 @@ import type { EntityRecord } from "./types";
 export interface HighlightSegment {
   text: string;
   entity?: EntityRecord;
+  evidence?: boolean;
 }
 
 interface NormalizedText {
@@ -109,9 +110,43 @@ function findEntityName(text: string, entity: EntityRecord): TextRange | undefin
   return findNormalizedMatch(text, entity.name);
 }
 
+function findEvidenceRange(
+  text: string,
+  entity: EntityRecord,
+  entityRange?: TextRange,
+): TextRange | undefined {
+  const declaredRanges = declaredEvidenceRanges(entity)
+    .map((range) => ({
+      start: Math.max(0, Math.min(text.length, range.start)),
+      end: Math.max(0, Math.min(text.length, range.end)),
+    }))
+    .filter((range) => range.end > range.start);
+
+  const containingDeclaredRange = declaredRanges.find(
+    (range) =>
+      !entityRange ||
+      (range.start <= entityRange.start && range.end >= entityRange.end),
+  );
+  if (containingDeclaredRange) return containingDeclaredRange;
+
+  for (const evidence of evidenceCandidates(entity)) {
+    const match = findNormalizedMatch(text, evidence);
+    if (
+      match &&
+      (!entityRange ||
+        (match.start <= entityRange.start && match.end >= entityRange.end))
+    ) {
+      return match;
+    }
+  }
+
+  return declaredRanges[0];
+}
+
 export function buildHighlightSegments(
   text: string,
   entities: EntityRecord[],
+  selectedEntityId = "",
 ): HighlightSegment[] {
   const matches: Array<{ start: number; end: number; entity: EntityRecord }> = [];
 
@@ -136,16 +171,44 @@ export function buildHighlightSegments(
     cursor = match.end;
   }
 
-  const segments: HighlightSegment[] = [];
-  cursor = 0;
+  const selectedEntity = entities.find(
+    (entity) => entity.entity_id === selectedEntityId,
+  );
+  const selectedEntityRange = selectedEntity
+    ? findEntityName(text, selectedEntity)
+    : undefined;
+  const evidenceRange = selectedEntity
+    ? findEvidenceRange(text, selectedEntity, selectedEntityRange)
+    : undefined;
+
+  const boundaries = new Set<number>([0, text.length]);
   for (const match of accepted) {
-    if (match.start > cursor) segments.push({ text: text.slice(cursor, match.start) });
-    segments.push({
-      text: text.slice(match.start, match.end),
-      entity: match.entity,
-    });
-    cursor = match.end;
+    boundaries.add(match.start);
+    boundaries.add(match.end);
   }
-  if (cursor < text.length) segments.push({ text: text.slice(cursor) });
+  if (evidenceRange) {
+    boundaries.add(evidenceRange.start);
+    boundaries.add(evidenceRange.end);
+  }
+
+  const sortedBoundaries = Array.from(boundaries).sort((a, b) => a - b);
+  const segments: HighlightSegment[] = [];
+  for (let index = 0; index < sortedBoundaries.length - 1; index += 1) {
+    const start = sortedBoundaries[index];
+    const end = sortedBoundaries[index + 1];
+    if (end <= start) continue;
+
+    const entityMatch = accepted.find(
+      (match) => match.start <= start && match.end >= end,
+    );
+    const isEvidence = Boolean(
+      evidenceRange && evidenceRange.start < end && evidenceRange.end > start,
+    );
+    segments.push({
+      text: text.slice(start, end),
+      ...(entityMatch ? { entity: entityMatch.entity } : {}),
+      ...(isEvidence ? { evidence: true } : {}),
+    });
+  }
   return segments;
 }

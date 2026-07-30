@@ -131,7 +131,11 @@ const filteredChunks = computed(() => {
 });
 const highlightedSegments = computed(() =>
   detail.value
-    ? buildHighlightSegments(detail.value.chunk.text, detail.value.entities)
+    ? buildHighlightSegments(
+        detail.value.chunk.text,
+        detail.value.entities,
+        selectedEntityId.value,
+      )
     : [],
 );
 const visibleEntities = computed(() => detail.value?.entities ?? []);

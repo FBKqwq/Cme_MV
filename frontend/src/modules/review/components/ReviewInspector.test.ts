@@ -114,18 +114,20 @@ describe("EntityReviewPanel", () => {
 
     expect(sourceCard).toBeDefined();
     expect(sourceCard?.classes()).toContain("state-accepted");
-    expect(sourceCard?.text()).toContain("拒绝");
+    expect(sourceCard?.get(".machine-status").text()).toContain("机器判定");
+    expect(sourceCard?.get(".machine-status").text()).toContain("接受");
+    expect(sourceCard?.get(".review-action").text()).toBe("人工拒绝");
     expect(sourceCard?.text()).not.toContain("确认接受");
     expect(sourceCard?.text()).not.toContain("转回复验");
-    expect(sourceCard?.findAll(".text-action")).toHaveLength(1);
+    expect(sourceCard?.findAll(".review-action")).toHaveLength(1);
 
-    await sourceCard!.get(".text-action").trigger("click");
+    await sourceCard!.get(".review-action").trigger("click");
     expect(wrapper.emitted("reject")?.[0]).toEqual([accepted]);
     expect(wrapper.emitted("approve")).toBeUndefined();
     expect(wrapper.emitted("unapprove")).toBeUndefined();
   });
 
-  it("keeps a human-rejected accepted entity in the accepted lane", () => {
+  it("keeps machine status separate from a human rejection", async () => {
     const humanRejected = {
       ...accepted,
       _review: { ...review, deleted: true },
@@ -137,9 +139,12 @@ describe("EntityReviewPanel", () => {
     expect(wrapper.get(".accepted-lane .entity-card").classes()).toContain(
       "state-rejected",
     );
-    expect(wrapper.get(".accepted-lane .entity-card").text()).toContain(
-      "撤销拒绝",
-    );
+    const sourceCard = wrapper.get(".accepted-lane .entity-card");
+    expect(sourceCard.get(".machine-status").text()).toContain("接受");
+    expect(sourceCard.get(".review-action").text()).toBe("撤销人工拒绝");
+
+    await sourceCard.get(".review-action").trigger("click");
+    expect(wrapper.emitted("restore")?.[0]).toEqual([humanRejected]);
   });
 
   it("shows the full colored entity type only once", () => {
