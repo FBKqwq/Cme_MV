@@ -1,0 +1,61 @@
+{
+  "doc_id": "2014 成人感染性心内膜炎预防、诊断和治疗专家共识",
+  "pdf_path": "C:\\Users\\zhurunjie\\Desktop\\snorkel\\code\\data\\F_pipeline_run_test_5\\raw_pdf\\2014 成人感染性心内膜炎预防、诊断和治疗专家共识.pdf",
+  "total_chunks": 0,
+  "chunks": [],
+  "figure_table_objects": [],
+  "skipped": true,
+  "skip_reason": "garbled_or_unusable_parsed_text",
+  "text_quality_report": {
+    "stage": "parsed_pdf_text_quality",
+    "enabled": true,
+    "status": "skipped_garbled_text",
+    "skip": true,
+    "reasons": [
+      "embedded_font_cid_markers",
+      "cjk_title_body_language_mismatch"
+    ],
+    "total_chars": 52837,
+    "cjk_chars": 3,
+    "ascii_letter_chars": 17073,
+    "digit_chars": 13274,
+    "readable_chars": 47569,
+    "replacement_chars": 0,
+    "question_mark_chars": 332,
+    "control_chars": 0,
+    "symbol_chars": 4232,
+    "private_use_chars": 0,
+    "mojibake_marker_chars": 0,
+    "cid_marker_count": 2996,
+    "cid_marker_chars": 26964,
+    "document_hint_cjk_chars": 20,
+    "cjk_ratio": 0.0001,
+    "ascii_letter_ratio": 0.3231,
+    "readable_ratio": 0.9003,
+    "weird_ratio": 0.0863,
+    "mojibake_ratio": 0.0,
+    "cid_marker_ratio": 0.5103,
+    "thresholds": {
+      "min_text_chars": 80,
+      "max_cjk_ratio": 0.02,
+      "min_ascii_letter_ratio": 0.2,
+      "min_readable_ratio": 0.55,
+      "max_weird_ratio": 0.35,
+      "max_mojibake_ratio": 0.08,
+      "max_cid_marker_ratio": 0.01,
+      "max_cid_marker_count": 20,
+      "cjk_title_min_chars": 2,
+      "min_cjk_ratio_for_cjk_title": 0.01
+    }
+  },
+  "preparse_report": {
+    "parser": "opendataloader",
+    "json_path": "data\\processed_pages\\opendataloader\\2014 成人感染性心内膜炎预防、诊断和治疗专家共识\\input.json",
+    "total_elements": 16,
+    "total_objects": 13,
+    "page_count": 11,
+    "text_source": "pdfplumber",
+    "structure_source": "opendataloader",
+    "opendataloader_page_count": 11
+  }
+}

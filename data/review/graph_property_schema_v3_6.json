@@ -1,0 +1,248 @@
+{
+  "schema_name": "graph_property_schema_v3_6",
+  "schema_version": "3.6",
+  "source_document": "C:/Users/zhurunjie/Desktop/word/实体关系节点属性V3.6_统一关系与证据属性版.docx",
+  "description": "V3.6 graph contract. Entity, relation, evidence and wrapper properties are defined here as the single machine-readable source of truth.",
+  "required_evidence_fields": [
+    "source_document_ids",
+    "evidence_ids",
+    "evidence_spans",
+    "source_chunk_ids"
+  ],
+  "entities": {
+    "diseases": {
+      "label": "Disease",
+      "name": "Disease",
+      "zh_name": "疾病",
+      "id_property": "disease_id",
+      "extract_enabled": true,
+      "properties": [
+        {"name": "disease_id"}, {"name": "disease_name"}, {"name": "normalized_name"},
+        {"name": "aliases"}, {"name": "ICD_10"}, {"name": "source_document_ids"},
+        {"name": "evidence_ids"}, {"name": "model_confidence"}, {"name": "evidence_spans"},
+        {"name": "source_chunk_ids"}
+      ]
+    },
+    "sub_diseases": {
+      "label": "Sub_disease",
+      "name": "Sub_Disease",
+      "zh_name": "确诊名/疾病分型",
+      "id_property": "sub_disease_id",
+      "extract_enabled": true,
+      "properties": [
+        {"name": "sub_disease_id"}, {"name": "sub_disease_name"}, {"name": "parent_disease_id"},
+        {"name": "disease_subtype"}, {"name": "clinical_stage"}, {"name": "severity"},
+        {"name": "population"}, {"name": "gender"}, {"name": "age_min"}, {"name": "age_max"},
+        {"name": "evidence_ids"}, {"name": "model_confidence"}, {"name": "disease_type"},
+        {"name": "source_document_ids"}, {"name": "evidence_spans"}, {"name": "source_chunk_ids"}
+      ]
+    },
+    "symptoms": {
+      "label": "Symptom",
+      "name": "Symptom",
+      "zh_name": "症状/体征",
+      "id_property": "symptom_id",
+      "extract_enabled": true,
+      "properties": [
+        {"name": "symptom_id"}, {"name": "symptom_name"}, {"name": "standard_name"},
+        {"name": "body_site"}, {"name": "symptom_category"}, {"name": "evidence_ids"},
+        {"name": "model_confidence"}, {"name": "source_document_ids"}, {"name": "evidence_spans"},
+        {"name": "source_chunk_ids"}
+      ]
+    },
+    "tests": {
+      "label": "Test",
+      "name": "Test",
+      "zh_name": "检查/指标",
+      "id_property": "test_id",
+      "extract_enabled": true,
+      "properties": [
+        {"name": "test_id"}, {"name": "test_name"}, {"name": "standard_name"},
+        {"name": "exam_name"}, {"name": "exam_department"}, {"name": "test_type"},
+        {"name": "unit"}, {"name": "normal_range_min"}, {"name": "normal_range_max"},
+        {"name": "is_digital"}, {"name": "evidence_ids"}, {"name": "model_confidence"},
+        {"name": "source_document_ids"}, {"name": "evidence_spans"}, {"name": "source_chunk_ids"}
+      ]
+    },
+    "treatments": {
+      "label": "Treatment",
+      "name": "Treatment",
+      "zh_name": "治疗原则",
+      "id_property": "treatment_id",
+      "extract_enabled": true,
+      "properties": [
+        {"name": "treatment_id"}, {"name": "treatment_content"}, {"name": "evidence_ids"},
+        {"name": "model_confidence"}, {"name": "source_document_ids"}, {"name": "evidence_spans"},
+        {"name": "source_chunk_ids"}
+      ]
+    },
+    "plans": {
+      "label": "Plan",
+      "name": "Plan",
+      "zh_name": "治疗方案",
+      "id_property": "plan_id",
+      "extract_enabled": true,
+      "properties": [
+        {"name": "plan_id"}, {"name": "plan_content"}, {"name": "plan_level"},
+        {"name": "evidence_ids"}, {"name": "model_confidence"}, {"name": "source_document_ids"},
+        {"name": "evidence_spans"}, {"name": "source_chunk_ids"}
+      ]
+    },
+    "methods": {
+      "label": "Method",
+      "name": "Method",
+      "zh_name": "治疗方法",
+      "id_property": "method_id",
+      "extract_enabled": false,
+      "properties": [
+        {"name": "method_id"}, {"name": "method_content"}, {"name": "method_type"},
+        {"name": "evidence_ids"}, {"name": "model_confidence"}, {"name": "source_document_ids"},
+        {"name": "evidence_spans"}, {"name": "source_chunk_ids"}
+      ]
+    },
+    "etiologies": {
+      "label": "Etiology",
+      "name": "Etiology",
+      "zh_name": "病因",
+      "id_property": "etiology_id",
+      "extract_enabled": true,
+      "properties": [
+        {"name": "etiology_id"}, {"name": "etiology_content"}, {"name": "etiology_type"},
+        {"name": "evidence_ids"}, {"name": "model_confidence"}, {"name": "source_document_ids"},
+        {"name": "evidence_spans"}, {"name": "source_chunk_ids"}
+      ]
+    },
+    "pathogeneses": {
+      "label": "Pathogenesis",
+      "name": "Pathogenesis",
+      "zh_name": "发病机制",
+      "id_property": "pathogenesis_id",
+      "extract_enabled": true,
+      "properties": [
+        {"name": "pathogenesis_id"}, {"name": "pathogenesis_content"}, {"name": "evidence_ids"},
+        {"name": "model_confidence"}, {"name": "source_document_ids"}, {"name": "evidence_spans"},
+        {"name": "source_chunk_ids"}
+      ]
+    }
+  },
+  "relationships": {
+    "has_sub_disease": {
+      "relation_type": "has_sub_disease", "source_entity_type": "Disease", "target_entity_type": "Sub_disease",
+      "name": "Disease -[has_sub_disease]-> Sub_Disease", "zh_name": "包含分型", "enabled": true,
+      "properties": [
+        {"name": "relation_id"}, {"name": "relation_name"}, {"name": "relation_type"},
+        {"name": "evidence_ids"}, {"name": "model_confidence"}, {"name": "source_document_ids"},
+        {"name": "evidence_spans"}, {"name": "source_chunk_ids"}
+      ]
+    },
+    "manifests_as": {
+      "relation_type": "manifests_as", "source_entity_type": "Sub_disease", "target_entity_type": "Symptom",
+      "name": "Sub_Disease -[manifests_as]-> Symptom", "zh_name": "表现为", "enabled": true,
+      "properties": [
+        {"name": "relation_id"}, {"name": "relation_name"}, {"name": "relation_type"},
+        {"name": "raw_diagnostic_role"}, {"name": "type_info"}, {"name": "weight"},
+        {"name": "raw_typicality"}, {"name": "duration_condition"}, {"name": "section_priority"},
+        {"name": "evidence_ids"}, {"name": "model_confidence"}, {"name": "source_document_ids"},
+        {"name": "evidence_spans"}, {"name": "source_chunk_ids"},
+        {"name": "normalized_diagnostic_role"}, {"name": "normalized_typicality"}
+      ]
+    },
+    "requires_test": {
+      "relation_type": "requires_test", "source_entity_type": "Sub_disease", "target_entity_type": "Test",
+      "name": "Sub_Disease -[requires_test]-> Test", "zh_name": "需要检查", "enabled": true,
+      "properties": [
+        {"name": "relation_id"}, {"name": "relation_name"}, {"name": "relation_type"}, {"name": "type_info"},
+        {"name": "raw_diagnostic_role"}, {"name": "value_min"}, {"name": "value_max"}, {"name": "operator"},
+        {"name": "unit"}, {"name": "result_text"}, {"name": "weight"}, {"name": "gold_standard"},
+        {"name": "criterion_group_id"}, {"name": "required_count"}, {"name": "polarity"},
+        {"name": "raw_typicality"}, {"name": "section_priority"}, {"name": "evidence_level"},
+        {"name": "evidence_ids"}, {"name": "model_confidence"}, {"name": "source_document_ids"},
+        {"name": "evidence_spans"}, {"name": "source_chunk_ids"},
+        {"name": "normalized_diagnostic_role"}, {"name": "normalized_typicality"}
+      ]
+    },
+    "follows_treatment": {
+      "relation_type": "follows_treatment", "source_entity_type": "Sub_disease", "target_entity_type": "Treatment",
+      "name": "Sub_Disease -[follows_treatment]-> Treatment", "zh_name": "遵循治疗原则", "enabled": true,
+      "properties": [
+        {"name": "relation_id"}, {"name": "relation_name"}, {"name": "relation_type"},
+        {"name": "clinical_stage"}, {"name": "treatment_line"}, {"name": "applicable_condition"},
+        {"name": "recommendation_polarity"}, {"name": "raw_recommendation_strength"},
+        {"name": "decision_basis"}, {"name": "contraindication_note"}, {"name": "evidence_level"},
+        {"name": "source_section_title"}, {"name": "model_confidence"}, {"name": "evidence_ids"},
+        {"name": "source_document_ids"}, {"name": "evidence_spans"}, {"name": "source_chunk_ids"},
+        {"name": "normalized_recommendation_strength"}, {"name": "source_section_path"}, {"name": "evidence_text"}
+      ]
+    },
+    "implements_by": {
+      "relation_type": "implements_by", "source_entity_type": "Treatment", "target_entity_type": "Plan",
+      "name": "Treatment -[implements_by]-> Plan", "zh_name": "落实为", "enabled": true,
+      "properties": [
+        {"name": "relation_id"}, {"name": "relation_name"}, {"name": "relation_type"},
+        {"name": "priority"}, {"name": "plan_role"}, {"name": "applicable_condition"},
+        {"name": "contraindication_note"}, {"name": "evidence_ids"}, {"name": "model_confidence"},
+        {"name": "source_document_ids"}, {"name": "evidence_spans"}, {"name": "source_chunk_ids"}
+      ]
+    },
+    "causes": {
+      "relation_type": "causes", "source_entity_type": "Etiology", "target_entity_type": "Sub_disease",
+      "name": "Etiology -[causes]-> Sub_Disease", "zh_name": "由病因导致", "enabled": true,
+      "properties": [
+        {"name": "relation_id"}, {"name": "relation_name"}, {"name": "relation_type"},
+        {"name": "raw_causal_strength"}, {"name": "raw_typicality"}, {"name": "evidence_ids"},
+        {"name": "model_confidence"}, {"name": "source_document_ids"}, {"name": "evidence_spans"},
+        {"name": "source_chunk_ids"}, {"name": "normalized_causal_strength"}, {"name": "normalized_typicality"}
+      ]
+    },
+    "explained_by": {
+      "relation_type": "explained_by", "source_entity_type": "Sub_disease", "target_entity_type": "Pathogenesis",
+      "name": "Sub_Disease -[explained_by]-> Pathogenesis", "zh_name": "由机制解释", "enabled": true,
+      "properties": [
+        {"name": "relation_id"}, {"name": "relation_name"}, {"name": "relation_type"},
+        {"name": "evidence_ids"}, {"name": "model_confidence"}, {"name": "source_document_ids"},
+        {"name": "evidence_spans"}, {"name": "source_chunk_ids"}
+      ]
+    },
+    "plan_method": {
+      "relation_type": "implements_by", "source_entity_type": "Plan", "target_entity_type": "Method",
+      "name": "Plan -[implements_by]-> Method", "zh_name": "执行为", "enabled": false,
+      "properties": [
+        {"name": "frequency"}, {"name": "route"}, {"name": "duration"},
+        {"name": "cycle"}, {"name": "execution_condition"}
+      ]
+    }
+  },
+  "fusion_layers": {
+    "entity_node_wrapper": [
+      "entity_node_id", "document_id", "source_document_ref", "source_chunk_id",
+      "source_section_title", "source_section_path", "source_title", "document_core_disease",
+      "inferred_department", "metadata", "entity_type", "name", "content", "properties",
+      "evidence_text", "model_confidence", "status", "entity_status", "property_status",
+      "source_lfs", "lv2_probability", "top2_gap", "chunk_context_role",
+      "belongs_to_document_disease", "document_scope_gate", "source_document_ids",
+      "evidence_ids", "evidence_spans", "source_chunk_ids"
+    ],
+    "mention": [
+      "mention_id", "entity_type", "mention_name", "normalized_name", "status", "fusion_score",
+      "raw_entity_node_ids", "entity_node_wrappers", "source_names", "aliases", "source_chunk_ids",
+      "evidence_texts", "embedding_standard_ids", "embedding_standard_names", "mention_name_source",
+      "properties_by_entity_node", "usable_for_reasoning", "source_document_ids", "evidence_ids", "evidence_spans"
+    ],
+    "entity_node_pair_evidence": [
+      "candidate_id", "start_mention_id", "end_mention_id", "relation_type",
+      "start_entity_node_id", "end_entity_node_id", "start_entity_node_name", "end_entity_node_name",
+      "start_entity_node_evidence", "end_entity_node_evidence", "start_source_chunk_id",
+      "end_source_chunk_id", "source_chunk_id", "search_level", "chunk_distance", "trigger_score",
+      "context_level", "evidence_text", "model_confidence", "properties",
+      "source_document_ids", "evidence_ids", "evidence_spans", "source_chunk_ids"
+    ],
+    "mention_relation_fusion": [
+      "fusion_key", "evidence_entity_node_pairs", "mention_relation_id", "mention_relation_name",
+      "mention_support_count", "unique_chunk_count", "mean_evidence_confidence", "max_evidence_confidence",
+      "same_chunk_ratio", "context_level_score", "role_strength_score", "typicality_score", "weight_score",
+      "criterion_group_id", "required_count", "fusion_score", "pca_fusion_score", "pca_explained_variance",
+      "pca_top_features", "fusion_method", "calibrated_confidence", "polarity", "diagnostic_role",
+      "clinical_stage", "treatment_line", "applicable_condition"
+    ]
+  }
+}
