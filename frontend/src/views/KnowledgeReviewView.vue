@@ -58,6 +58,9 @@ const saveState = ref<SaveState>("idle");
 const entityDraftDirty = ref(false);
 const chunkSwitching = ref(false);
 const savingLabel = computed(() => {
+  if (saveState.value === "saving" && chunkSwitching.value) {
+    return "正在保存，完成后自动切换";
+  }
   if (saveState.value === "saving") return "保存中";
   if (saveState.value === "saved") return "已保存";
   if (saveState.value === "error") return "保存失败";
@@ -82,6 +85,8 @@ const toast = reactive<{
 }>({ visible: false, message: "" });
 let toastTimer: number | undefined;
 let detailRequestId = 0;
+let entityDraftRevision = 0;
+let entityFlushPromise: Promise<boolean> | null = null;
 
 const entityDraft = reactive<EntityDraft>({
   name: "",
@@ -248,15 +253,16 @@ async function loadTaskAndChunks(selectInitial = false) {
   }
 }
 
-async function loadChunk(chunkId: string) {
+async function loadChunk(chunkId: string): Promise<boolean> {
   const requestId = ++detailRequestId;
   detailLoading.value = true;
+  detail.value = null;
   errorMessage.value = "";
   try {
     const result = await api<ChunkDetail>(
       `/api/review/chunks/${encodeURIComponent(chunkId)}`,
     );
-    if (requestId !== detailRequestId) return;
+    if (requestId !== detailRequestId) return false;
     detail.value = result;
     entityDraftDirty.value = false;
     if (task.value) task.value.version = detail.value.version;
@@ -268,9 +274,11 @@ async function loadChunk(chunkId: string) {
     relationEditingId.value = "";
     showAddEntity.value = false;
     showAddRelation.value = false;
+    return true;
   } catch (error) {
-    if (requestId !== detailRequestId) return;
+    if (requestId !== detailRequestId) return false;
     errorMessage.value = errorText(error);
+    return false;
   } finally {
     if (requestId === detailRequestId) detailLoading.value = false;
   }
@@ -280,12 +288,29 @@ async function selectChunk(chunkId: string): Promise<boolean> {
   if (chunkId === activeChunkId.value) return true;
   if (chunkSwitching.value) return false;
   chunkSwitching.value = true;
+  const previousChunkId = activeChunkId.value;
+  const previousDetail = detail.value;
+  const previousPdf = selectedPdf.value;
+  const hadDirtyDraft = entityDraftDirty.value;
   try {
+    if (hadDirtyDraft) {
+      showToast("正在保存当前 Chunk，保存完成后将自动切换");
+    }
     if (!(await flushEntityDraft())) return false;
     const chunk = chunks.value.find((item) => item.chunk_id === chunkId);
     if (chunk?._source_title) selectedPdf.value = chunk._source_title;
     activeChunkId.value = chunkId;
-    await loadChunk(chunkId);
+    const loaded = await loadChunk(chunkId);
+    if (!loaded) {
+      activeChunkId.value = previousChunkId;
+      selectedPdf.value = previousPdf;
+      detail.value = previousDetail;
+      showToast(`切换失败：${errorMessage.value}`);
+      return false;
+    }
+    if (hadDirtyDraft) {
+      showToast("当前 Chunk 已保存，已切换到下一项");
+    }
     return true;
   } finally {
     chunkSwitching.value = false;
@@ -314,7 +339,11 @@ async function bootstrap() {
 }
 
 async function refreshAfterMutation(preferredId?: string, kind?: ReviewTab) {
-  await Promise.all([loadTaskAndChunks(), loadChunk(activeChunkId.value)]);
+  const [, loaded] = await Promise.all([
+    loadTaskAndChunks(),
+    loadChunk(activeChunkId.value),
+  ]);
+  if (!loaded) throw new Error(errorMessage.value || "当前 Chunk 重新加载失败");
   if (preferredId && kind === "entities") selectedEntityId.value = preferredId;
   if (preferredId && kind === "relationships") selectedRelationId.value = preferredId;
 }
@@ -336,6 +365,7 @@ function failSaving(error: unknown) {
 }
 
 function markEntityDraftDirty() {
+  entityDraftRevision += 1;
   entityDraftDirty.value = true;
   saveState.value = "dirty";
 }
@@ -351,36 +381,53 @@ function entitySnapshots(): ChunkEntitySnapshot[] {
       entity.evidence_span?.raw_text ||
       entity.name,
     rejected: Boolean(entity._review.deleted),
+    approved: Boolean(entity._review.approved),
   }));
 }
 
-async function flushEntityDraft(): Promise<boolean> {
+async function runEntityDraftFlush(): Promise<boolean> {
   if (!entityDraftDirty.value || !detail.value || !activeChunkId.value) {
     return true;
   }
-  beginSaving();
-  try {
-    const result = await api<{ version: number; changed: number }>(
-      `/api/review/chunks/${encodeURIComponent(activeChunkId.value)}/entities`,
-      {
-        ...mutation("PUT", {
-          base_version: detail.value.version,
-          entities: entitySnapshots(),
-        }),
-      },
-    );
-    detail.value.version = result.version;
-    if (task.value) task.value.version = result.version;
-    entityDraftDirty.value = false;
-    finishSaving();
-    return true;
-  } catch (error) {
-    failSaving(error);
-    if (error instanceof ApiError && error.status === 409) {
-      showToast("保存失败：服务端数据已变化，本地修改仍保留，请刷新后重试");
+  while (entityDraftDirty.value && detail.value && activeChunkId.value) {
+    const revision = entityDraftRevision;
+    const savingDetail = detail.value;
+    const savingChunkId = activeChunkId.value;
+    beginSaving();
+    try {
+      const result = await api<{ version: number; changed: number }>(
+        `/api/review/chunks/${encodeURIComponent(savingChunkId)}/entities`,
+        {
+          ...mutation("PUT", {
+            base_version: savingDetail.version,
+            entities: entitySnapshots(),
+          }),
+        },
+      );
+      savingDetail.version = result.version;
+      if (task.value) task.value.version = result.version;
+      if (entityDraftRevision === revision) {
+        entityDraftDirty.value = false;
+        finishSaving();
+        return true;
+      }
+    } catch (error) {
+      failSaving(error);
+      if (error instanceof ApiError && error.status === 409) {
+        showToast("保存失败：服务端数据已变化，本地修改仍保留，请刷新后重试");
+      }
+      return false;
     }
-    return false;
   }
+  return true;
+}
+
+function flushEntityDraft(): Promise<boolean> {
+  if (entityFlushPromise) return entityFlushPromise;
+  entityFlushPromise = runEntityDraftFlush().finally(() => {
+    entityFlushPromise = null;
+  });
+  return entityFlushPromise;
 }
 
 async function performMutation(
@@ -459,14 +506,37 @@ function saveEntity(entity: EntityRecord) {
 
 function rejectEntity(entity: EntityRecord) {
   entity._review.deleted = true;
+  entity._review.approved = false;
   markEntityDraftDirty();
   showToast("已在本页标记拒绝，切换 Chunk 时保存");
 }
 
 function restoreEntity(entity: EntityRecord) {
   entity._review.deleted = false;
+  entity._review.approved = false;
   markEntityDraftDirty();
   showToast("已撤销拒绝，切换 Chunk 时保存");
+}
+
+function approveEntity(entity: EntityRecord) {
+  entity._review.deleted = false;
+  entity._review.approved = true;
+  markEntityDraftDirty();
+  showToast(
+    entity.status === "rejected"
+      ? "已标记人工接收，切换 Chunk 时保存"
+      : "已标记人工通过，切换 Chunk 时保存",
+  );
+}
+
+function unapproveEntity(entity: EntityRecord) {
+  entity._review.approved = false;
+  markEntityDraftDirty();
+  showToast(
+    entity.status === "rejected"
+      ? "已撤销人工接收，切换 Chunk 时保存"
+      : "已撤销人工通过，切换 Chunk 时保存",
+  );
 }
 
 function openCreateEntity(evidence = selectedEvidence.value) {
@@ -960,6 +1030,8 @@ onBeforeUnmount(() => {
           @save="saveEntity"
           @reject="rejectEntity"
           @restore="restoreEntity"
+          @approve="approveEntity"
+          @unapprove="unapproveEntity"
           @create="createEntity"
           @cancel-create="showAddEntity = false"
           @update-draft="Object.assign(entityDraft, $event)"

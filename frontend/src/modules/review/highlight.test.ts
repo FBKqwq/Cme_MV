@@ -89,6 +89,17 @@ describe("buildHighlightSegments", () => {
     expect(segments[0].entity?.entity_id).toBe("E-rejected");
   });
 
+  it("treats a manual approval as accepted without changing machine status", () => {
+    const manuallyApproved = entity("口腔溃疡");
+    manuallyApproved.status = "review";
+    manuallyApproved._review.approved = true;
+
+    const segments = buildHighlightSegments("口腔溃疡", [manuallyApproved]);
+
+    expect(segments[0].entity?._review.approved).toBe(true);
+    expect(segments[0].entity?.status).toBe("review");
+  });
+
   it("marks the selected entity evidence without losing the entity segment", () => {
     const text = "主要表现为反复发作的口腔溃疡、生殖器溃疡。";
     const selected = entity("口腔溃疡", "反复发作的口腔溃疡");

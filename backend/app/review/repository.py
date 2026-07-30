@@ -5,6 +5,7 @@ import json
 import os
 import re
 import threading
+import time
 import uuid
 import zipfile
 from collections import defaultdict
@@ -345,11 +346,28 @@ class ReviewRepository:
     def _atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         temporary = path.with_suffix(path.suffix + f".{uuid.uuid4().hex}.tmp")
-        temporary.write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
-        )
-        os.replace(temporary, path)
+        try:
+            with temporary.open("w", encoding="utf-8", newline="\n") as handle:
+                json.dump(
+                    payload,
+                    handle,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                )
+                handle.write("\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+            for attempt in range(5):
+                try:
+                    os.replace(temporary, path)
+                    break
+                except PermissionError:
+                    if attempt == 4:
+                        raise
+                    time.sleep(0.02 * (2**attempt))
+        finally:
+            if temporary.exists():
+                temporary.unlink()
 
     @staticmethod
     def _source_result_entity(entity: dict[str, Any]) -> dict[str, Any]:
@@ -357,6 +375,7 @@ class ReviewRepository:
         result.update(
             {
                 "review_flag": "pending",
+                "review_decision": "pending",
                 "review_operation": "source",
                 "review_scope": "current",
                 "corrected_values": {},
@@ -410,6 +429,7 @@ class ReviewRepository:
         source_ids: set[str] = set()
         review_fields = {
             "review_flag",
+            "review_decision",
             "review_operation",
             "review_scope",
             "corrected_values",
@@ -422,7 +442,10 @@ class ReviewRepository:
             record_id = str(fresh.get(id_field, ""))
             source_ids.add(record_id)
             previous = previous_by_id.get(record_id)
-            if previous and previous.get("review_operation") != "source":
+            if previous and (
+                previous.get("review_operation") != "source"
+                or previous.get("review_decision") != "pending"
+            ):
                 for field in review_fields:
                     if field in previous:
                         fresh[field] = deepcopy(previous[field])
@@ -554,7 +577,8 @@ class ReviewRepository:
         for result in self.results.values():
             for record in result.get(collection, []):
                 operation = record.get("review_operation", "source")
-                if operation == "source":
+                decision = str(record.get("review_decision") or "pending")
+                if operation == "source" and decision == "pending":
                     continue
                 corrected = deepcopy(record.get("corrected_values", {}))
                 if operation == "create":
@@ -562,7 +586,7 @@ class ReviewRepository:
                         key: value
                         for key, value in record.items()
                         if key not in {
-                            "review_flag", "review_operation", "review_scope", "corrected_values",
+                            "review_flag", "review_decision", "review_operation", "review_scope", "corrected_values",
                             "review_version", "review_updated_at",
                         }
                     }
@@ -575,6 +599,7 @@ class ReviewRepository:
                     "record_id": record_id,
                     "chunk_id": str(record.get("chunk_id", "")),
                     "operation": operation,
+                    "decision": decision,
                     "scope": record.get("review_scope", "current"),
                     "payload_json": json.dumps(payload, ensure_ascii=False),
                     "before_json": json.dumps(record, ensure_ascii=False),
@@ -600,6 +625,7 @@ class ReviewRepository:
             "deleted": row["operation"] == "delete",
             "added": row["operation"] == "create",
             "modified": row["operation"] in {"update", "delete"},
+            "approved": row.get("decision") == "accepted",
         }
         return projected
 
@@ -618,6 +644,7 @@ class ReviewRepository:
                     "deleted": False,
                     "added": False,
                     "modified": False,
+                    "approved": False,
                 }
                 projected.append(item)
         for record_id, row in overrides.items():
@@ -639,6 +666,7 @@ class ReviewRepository:
                     "deleted": False,
                     "added": False,
                     "modified": False,
+                    "approved": False,
                 },
             )
             projected.append(item)
@@ -662,6 +690,7 @@ class ReviewRepository:
                     "deleted": False,
                     "added": False,
                     "modified": False,
+                    "approved": False,
                 }
                 projected.append(item)
         for record_id, row in overrides.items():
@@ -855,6 +884,9 @@ class ReviewRepository:
             }
             snapshot = {
                 "version": current_version,
+                "entities": entities,
+                "canonicals": canonicals,
+                "relationships": relationships,
                 "entity_options": entity_options,
                 "conflicts": conflicts,
                 "entities_by_chunk": entities_by_chunk,
@@ -863,6 +895,117 @@ class ReviewRepository:
             }
             self._snapshot = snapshot
             return snapshot
+
+    def _project_result_entity(
+        self,
+        entity_id: str,
+        record: dict[str, Any],
+    ) -> dict[str, Any]:
+        operation = str(record.get("review_operation") or "source")
+        decision = str(record.get("review_decision") or "pending")
+        source = self.entity_by_id.get(entity_id)
+        if operation == "source" and decision == "pending":
+            projected = deepcopy(source or record)
+            projected["_review"] = {
+                "operation": "source",
+                "deleted": False,
+                "added": False,
+                "modified": False,
+                "approved": False,
+            }
+            return projected
+
+        corrected = deepcopy(record.get("corrected_values", {}))
+        if operation == "create":
+            payload = {
+                key: value
+                for key, value in record.items()
+                if key
+                not in {
+                    "review_flag",
+                    "review_decision",
+                    "review_operation",
+                    "review_scope",
+                    "corrected_values",
+                    "review_version",
+                    "review_updated_at",
+                }
+            }
+            payload.update(corrected)
+        else:
+            payload = corrected
+        return self._apply_override(
+            source or {},
+            {
+                "operation": operation,
+                "decision": decision,
+                "scope": record.get("review_scope", "current"),
+                "payload_json": json.dumps(payload, ensure_ascii=False),
+                "version": int(record.get("review_version", 0)),
+                "updated_at": record.get("review_updated_at"),
+            },
+        )
+
+    def _refresh_snapshot_after_entity_save(
+        self,
+        previous_snapshot: dict[str, Any] | None,
+        *,
+        chunk_id: str,
+        changed_ids: set[str],
+        version: int,
+    ) -> None:
+        """Patch the hot projection after a chunk save instead of rebuilding it."""
+        if previous_snapshot is None:
+            return
+
+        entities = list(previous_snapshot["entities"])
+        entities_by_chunk = defaultdict(
+            list,
+            {
+                key: list(value)
+                for key, value in previous_snapshot["entities_by_chunk"].items()
+            },
+        )
+        document_id = self._document_id_for_chunk(chunk_id)
+        result_records = {
+            str(record.get("entity_id", "")): record
+            for record in self.results[document_id]["entities"]
+        }
+        replacements = {
+            entity_id: self._project_result_entity(
+                entity_id,
+                result_records[entity_id],
+            )
+            for entity_id in changed_ids
+        }
+        entities = [
+            replacements.get(str(entity.get("entity_id", "")), entity)
+            for entity in entities
+        ]
+        entities_by_chunk[chunk_id] = [
+            replacements.get(str(entity.get("entity_id", "")), entity)
+            for entity in entities_by_chunk[chunk_id]
+        ]
+
+        canonicals = self.projected_canonical_entities()
+        relationships = previous_snapshot["relationships"]
+        entity_options = self._entity_options(canonicals, entities)
+        conflicts = self._relation_conflicts(relationships, entity_options)
+        override_chunks = set(previous_snapshot["override_chunks"])
+        override_chunks.add(chunk_id)
+        self._snapshot = {
+            "version": version,
+            "entities": entities,
+            "canonicals": canonicals,
+            "relationships": relationships,
+            "entity_options": entity_options,
+            "conflicts": conflicts,
+            "entities_by_chunk": entities_by_chunk,
+            "relationships_by_chunk": previous_snapshot[
+                "relationships_by_chunk"
+            ],
+            "override_chunks": override_chunks,
+        }
 
     def _chunk_review_rows(self) -> dict[str, dict[str, Any]]:
         rows: dict[str, dict[str, Any]] = {}
@@ -1042,10 +1185,13 @@ class ReviewRepository:
         if chunk_id not in self.chunk_by_id:
             raise HTTPException(status_code=404, detail="未找到该 chunk")
 
+        previous_snapshot = self._review_snapshot()
         current = {
             str(entity["entity_id"]): entity
-            for entity in self.projected_entities()
-            if str(entity.get("chunk_id", "")) == chunk_id
+            for entity in previous_snapshot["entities_by_chunk"].get(
+                chunk_id,
+                [],
+            )
         }
         snapshots = payload.get("entities", [])
         submitted_ids = [str(item.get("entity_id", "")) for item in snapshots]
@@ -1085,14 +1231,22 @@ class ReviewRepository:
             ):
                 raise HTTPException(status_code=422, detail="实体类型不在 V3.6 契约中")
             rejected = bool(snapshot.get("rejected"))
+            approved = bool(snapshot.get("approved")) and not rejected
             currently_rejected = bool(existing["_review"].get("deleted"))
-            if patch or rejected != currently_rejected:
+            currently_approved = bool(existing["_review"].get("approved"))
+            if (
+                patch
+                or rejected != currently_rejected
+                or approved != currently_approved
+            ):
                 prepared.append(
                     {
                         "entity_id": entity_id,
                         "existing": existing,
                         "patch": patch,
                         "rejected": rejected,
+                        "approved": approved,
+                        "currently_approved": currently_approved,
                     }
                 )
 
@@ -1104,11 +1258,21 @@ class ReviewRepository:
             }
 
         document_id = self._document_id_for_chunk(chunk_id)
-        result = deepcopy(self.results[document_id])
+        result = self.results[document_id]
         records = {
             str(record.get("entity_id", "")): record
             for record in result["entities"]
         }
+        record_backups = {
+            change["entity_id"]: deepcopy(records[change["entity_id"]])
+            for change in prepared
+        }
+        canonical_backup = deepcopy(result["canonical_entities"])
+        chunk_review_missing = chunk_id not in result["chunk_reviews"]
+        chunk_review_backup = deepcopy(result["chunk_reviews"].get(chunk_id))
+        audit_length = len(result["audit_events"])
+        previous_version = result.get("version", 0)
+        previous_updated_at = result.get("updated_at")
         timestamp = utc_now()
         version = self.version() + 1
         sequence = sum(
@@ -1121,6 +1285,8 @@ class ReviewRepository:
             existing = change["existing"]
             patch = deepcopy(change["patch"])
             rejected = change["rejected"]
+            approved = change["approved"]
+            currently_approved = change["currently_approved"]
             record = records[entity_id]
             previous_operation = str(record.get("review_operation") or "source")
 
@@ -1156,15 +1322,21 @@ class ReviewRepository:
                     record.pop("restore_metadata", None)
                 record["review_operation"] = "delete"
                 record["review_flag"] = "deleted"
+                record["review_decision"] = "rejected"
                 action = "delete"
             else:
                 record.pop("restore_metadata", None)
                 record["review_operation"] = underlying_operation
                 record["review_scope"] = underlying_scope
+                record["review_decision"] = (
+                    "accepted" if approved else "pending"
+                )
                 if underlying_operation == "create":
                     record["review_flag"] = "added"
                 elif underlying_operation == "update":
                     record["review_flag"] = "modified"
+                elif approved:
+                    record["review_flag"] = "approved"
                 else:
                     record["review_flag"] = "pending"
                     if not patch:
@@ -1172,7 +1344,15 @@ class ReviewRepository:
                 action = (
                     "restore"
                     if bool(existing["_review"].get("deleted"))
-                    else "update"
+                    else (
+                        "approve"
+                        if approved and not currently_approved
+                        else (
+                            "unapprove"
+                            if currently_approved and not approved
+                            else "update"
+                        )
+                    )
                 )
 
             record.update(
@@ -1224,6 +1404,7 @@ class ReviewRepository:
                     "after": {
                         **patch,
                         "rejected": rejected,
+                        "approved": approved,
                     },
                     "version": version,
                     "created_at": timestamp,
@@ -1239,13 +1420,26 @@ class ReviewRepository:
         }
         result["version"] = version
         result["updated_at"] = timestamp
-        previous_result = self.results[document_id]
-        previous_snapshot = self._snapshot
-        self.results[document_id] = result
         try:
             self._save_result(document_id)
+            self._refresh_snapshot_after_entity_save(
+                previous_snapshot,
+                chunk_id=chunk_id,
+                changed_ids=set(record_backups),
+                version=version,
+            )
         except Exception:
-            self.results[document_id] = previous_result
+            for entity_id, backup in record_backups.items():
+                records[entity_id].clear()
+                records[entity_id].update(backup)
+            result["canonical_entities"] = canonical_backup
+            del result["audit_events"][audit_length:]
+            if chunk_review_missing:
+                result["chunk_reviews"].pop(chunk_id, None)
+            else:
+                result["chunk_reviews"][chunk_id] = chunk_review_backup
+            result["version"] = previous_version
+            result["updated_at"] = previous_updated_at
             self._snapshot = previous_snapshot
             raise
         return {

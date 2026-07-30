@@ -156,7 +156,11 @@ export function buildHighlightSegments(
   }
 
   const statePriority = (entity: EntityRecord) =>
-    entity._review.deleted ? 0 : entity.status === "accepted" ? 2 : 1;
+    entity._review.deleted
+      ? 0
+      : entity._review.approved || entity.status === "accepted"
+        ? 2
+        : 1;
   matches.sort(
     (a, b) =>
       a.start - b.start ||

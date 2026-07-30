@@ -147,6 +147,72 @@ describe("EntityReviewPanel", () => {
     expect(wrapper.emitted("restore")?.[0]).toEqual([humanRejected]);
   });
 
+  it("allows a review entity to be manually approved without changing machine state", async () => {
+    const wrapper = createWrapper({ pendingEntities: [pending] });
+    const reviewCard = wrapper.get(".decision-lane .entity-card");
+
+    expect(reviewCard.get(".machine-status").text()).toContain("复验");
+    expect(reviewCard.get(".review-action.approve").text()).toBe("人工通过");
+
+    await reviewCard.get(".review-action.approve").trigger("click");
+
+    expect(wrapper.emitted("approve")?.[0]).toEqual([pending]);
+  });
+
+  it("allows a manual approval to be undone", async () => {
+    const manuallyApproved = {
+      ...pending,
+      _review: { ...review, approved: true },
+    };
+    const wrapper = createWrapper({ pendingEntities: [manuallyApproved] });
+    const reviewCard = wrapper.get(".decision-lane .entity-card");
+
+    expect(reviewCard.classes()).toContain("state-accepted");
+    expect(reviewCard.get(".machine-status").text()).toContain("复验");
+    expect(reviewCard.get(".review-action.restore").text()).toBe("撤销人工通过");
+
+    await reviewCard.get(".review-action.restore").trigger("click");
+
+    expect(wrapper.emitted("unapprove")?.[0]).toEqual([manuallyApproved]);
+  });
+
+  it("replaces manual rejection with manual acceptance for a machine-rejected entity", async () => {
+    const wrapper = createWrapper({ pendingEntities: [rejected] });
+    const rejectedCard = wrapper.get(".decision-lane .entity-card");
+
+    expect(rejectedCard.get(".machine-status").text()).toContain("拒绝");
+    expect(rejectedCard.get(".review-action.approve").text()).toBe("人工接收");
+    expect(rejectedCard.find(".review-action.danger").exists()).toBe(false);
+
+    await rejectedCard.get(".review-action.approve").trigger("click");
+
+    expect(wrapper.emitted("approve")?.[0]).toEqual([rejected]);
+  });
+
+  it("allows manual acceptance of a machine rejection to be undone", async () => {
+    const manuallyAccepted = {
+      ...rejected,
+      _review: { ...review, approved: true },
+    };
+    const wrapper = createWrapper({ pendingEntities: [manuallyAccepted] });
+    const acceptedCard = wrapper.get(".decision-lane .entity-card");
+
+    expect(acceptedCard.classes()).toContain("state-accepted");
+    expect(acceptedCard.get(".machine-status").text()).toContain("拒绝");
+    expect(acceptedCard.get(".review-action.restore").text()).toBe("撤销人工接收");
+
+    await acceptedCard.get(".review-action.restore").trigger("click");
+
+    expect(wrapper.emitted("unapprove")?.[0]).toEqual([manuallyAccepted]);
+  });
+
+  it("keeps entity edits scoped to the current Chunk", () => {
+    const wrapper = createWrapper({ editingId: pending.entity_id });
+
+    expect(wrapper.text()).toContain("仅修改当前 Chunk 中的这次提及");
+    expect(wrapper.text()).not.toContain("全部同源提及");
+  });
+
   it("shows the full colored entity type only once", () => {
     const sourceCard = createWrapper().get(".accepted-lane .entity-card");
 

@@ -2,7 +2,6 @@
 import { computed } from "vue";
 import {
   AlertCircle,
-  ArrowRight,
   Check,
   CheckCircle2,
   ChevronLeft,
@@ -60,7 +59,7 @@ const emit = defineEmits<{
   clearEntitySelection: [];
   captureSelection: [event: MouseEvent];
   createFromSelection: [];
-  approveNext: [];
+  skip: [];
 }>();
 </script>
 
@@ -68,7 +67,7 @@ const emit = defineEmits<{
   <section class="evidence-workspace">
     <div v-if="detailLoading" class="reader-loading">
       <LoaderCircle :size="24" class="spin" />
-      正在切换证据…
+      正在切换文本段…
     </div>
 
     <template v-else-if="detail">
@@ -123,6 +122,14 @@ const emit = defineEmits<{
           >
             <ChevronRight :size="18" />
           </button>
+          <button
+            class="button quiet compact"
+            type="button"
+            :disabled="activeChunkIndex >= totalChunks - 1"
+            @click="emit('skip')"
+          >
+            暂存并跳过
+          </button>
         </div>
       </div>
       <article
@@ -154,12 +161,16 @@ const emit = defineEmits<{
                       modified: segment.entity._review.modified,
                       accepted:
                         !segment.entity._review.deleted &&
-                        segment.entity.status === 'accepted',
+                        (segment.entity._review.approved ||
+                          segment.entity.status === 'accepted'),
                       rejected:
                         segment.entity._review.deleted ||
-                        segment.entity.status === 'rejected',
+                        (!segment.entity._review.approved &&
+                          segment.entity.status === 'rejected'),
+                      'human-rejected': segment.entity._review.deleted,
                       review:
                         !segment.entity._review.deleted &&
+                        !segment.entity._review.approved &&
                         segment.entity.status !== 'accepted' &&
                         segment.entity.status !== 'rejected',
                     },
@@ -215,21 +226,6 @@ const emit = defineEmits<{
               {{ detail.relationships.length }} 条关系
             </span>
           </div>
-        </div>
-        <div class="actionbar-actions">
-          <button
-            class="button quiet"
-            type="button"
-            :disabled="activeChunkIndex >= totalChunks - 1"
-            @click="emit('relative', 1)"
-          >
-            暂存并跳过
-          </button>
-          <button class="button approve" type="button" @click="emit('approveNext')">
-            <CheckCircle2 :size="17" />
-            通过并进入下一 Chunk
-            <ArrowRight :size="16" />
-          </button>
         </div>
       </footer>
     </template>
@@ -426,6 +422,9 @@ const emit = defineEmits<{
   --highlight-border: #dc2626;
   color: #b91c1c;
   background: rgba(220, 38, 38, 0.12);
+}
+
+.entity-highlight.human-rejected {
   text-decoration: line-through;
   text-decoration-color: #dc2626;
   text-decoration-thickness: 1.5px;
@@ -578,8 +577,7 @@ const emit = defineEmits<{
   backdrop-filter: blur(16px);
 }
 
-.actionbar-status,
-.actionbar-actions {
+.actionbar-status {
   display: flex;
   align-items: center;
 }
@@ -633,10 +631,6 @@ const emit = defineEmits<{
   background: var(--amber-soft);
 }
 
-.actionbar-actions {
-  gap: 8px;
-}
-
 @media (max-height: 820px) {
   .evidence-toolbar {
     min-height: 74px;
@@ -676,10 +670,6 @@ const emit = defineEmits<{
   }
 
   .actionbar-status > div > span {
-    display: none;
-  }
-
-  .actionbar-actions .button.quiet {
     display: none;
   }
 }

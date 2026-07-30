@@ -29,11 +29,12 @@ def load_repository(data_root: Path | None = None) -> None:
     try:
         repository = ReviewRepository(
             project_root=root.parents[1],
-            inbox_root=root,
+            inbox_root=root / "current",
             result_root=root / "state" / "results",
             export_root=root / "state" / "exports",
             schema_path=(
                 root
+                / "current"
                 / "graph_property_schema_v3_6.json"
             ),
         )
