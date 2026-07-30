@@ -8,6 +8,7 @@ __pycache__/
 *.pyc
 *.pyo
 .pytest_cache/
+.pytest-tmp-review-loader-20260729-1528/
 
 # 前端依赖和构建结果
 frontend/node_modules/
@@ -38,12 +39,7 @@ Thumbs.db
 artifacts/
 
 # 人工维护的知识复验数据与运行状态
-data/review/current/chunks/*
-!data/review/current/chunks/.gitkeep
-data/review/current/entity_nodes/*
-!data/review/current/entity_nodes/.gitkeep
-data/review/current/raw_pdf/*
-!data/review/current/raw_pdf/.gitkeep
-data/review/current/graph_property_schema_v3_6.json
-data/review/state/*
-!data/review/state/.gitkeep
+docs
+.claude/settings.json
+.pytest-tmp-review-loader-codex
+data
