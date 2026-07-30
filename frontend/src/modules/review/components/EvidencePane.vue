@@ -61,6 +61,19 @@ const emit = defineEmits<{
   createFromSelection: [];
   skip: [];
 }>();
+
+const acceptedCount = computed(() => {
+  return props.detail
+    ? props.detail.entities.filter((e) => !e._review?.deleted && e.status === "accepted").length
+    : 0;
+});
+
+const pendingCount = computed(() => {
+  return props.detail
+    ? props.detail.entities.filter((e) => e._review?.deleted || e.status !== "accepted").length
+    : 0;
+});
+
 </script>
 
 <template>
@@ -204,17 +217,6 @@ const emit = defineEmits<{
 
       <footer class="review-actionbar">
         <div class="actionbar-status">
-          <span
-            class="status-orb"
-            :class="{
-              approved: detail.review.status === 'approved',
-              issue: detail.review.issue_count > 0,
-            }"
-          >
-            <AlertCircle v-if="detail.review.issue_count" :size="15" />
-            <Check v-else-if="detail.review.status === 'approved'" :size="15" />
-            <CheckCircle2 v-else :size="15" />
-          </span>
           <div>
             <strong v-if="detail.review.issue_count">
               {{ detail.review.issue_count }} 项阻塞问题
@@ -222,8 +224,7 @@ const emit = defineEmits<{
             <strong v-else-if="detail.review.status === 'approved'">当前 Chunk 已通过</strong>
             <strong v-else>当前 Chunk 待复验</strong>
             <span>
-              {{ detail.entities.length }} 个实体 ·
-              {{ detail.relationships.length }} 条关系
+              {{ acceptedCount }} 个已接受 · {{ pendingCount }} 个待复验
             </span>
           </div>
         </div>
