@@ -4,17 +4,7 @@ import { useRoute } from 'vue-router'
 
 const route = useRoute()
 
-const activeMenu = computed(() => {
-  if (
-      route.name === 'case-detail'
-      || route.path.startsWith('/cases/')
-      && route.path !== '/cases/new'
-  ) {
-    return '/cases/history'
-  }
-
-  return route.path
-})
+const activeMenu = computed(() => route.path)
 </script>
 
 <template>
@@ -41,20 +31,12 @@ const activeMenu = computed(() => {
           active-text-color="#ffffff"
           class="sidebar-menu"
       >
-        <el-menu-item index="/">
-          系统首页
-        </el-menu-item>
-
         <el-menu-item index="/cases/new">
           病例录入
         </el-menu-item>
 
         <el-menu-item index="/excel-upload">
           Excel 上传
-        </el-menu-item>
-
-        <el-menu-item index="/cases/history">
-          历史病例
         </el-menu-item>
 
         <el-menu-item index="/model-management">
@@ -67,7 +49,7 @@ const activeMenu = computed(() => {
       </el-menu>
     </el-aside>
 
-    <el-container>
+    <el-container class="content-container">
       <el-header class="header">
         <div>
           <div class="header-title">
@@ -92,18 +74,38 @@ const activeMenu = computed(() => {
 </template>
 
 <style scoped>
+:global(html),
+:global(body),
+:global(#app) {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
 .app-container {
-  min-height: 100vh;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .sidebar {
-  min-height: 100vh;
+  height: 100vh;
+  flex-shrink: 0;
+  overflow-y: auto;
   background: #17365d;
+}
+
+.content-container {
+  height: 100vh;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .logo {
   height: 80px;
   padding: 18px 22px;
+  box-sizing: border-box;
   color: #ffffff;
   border-bottom: 1px solid rgb(255 255 255 / 12%);
 }
@@ -134,10 +136,12 @@ const activeMenu = computed(() => {
 
 .header {
   height: 80px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 28px;
+  box-sizing: border-box;
   background: #ffffff;
   border-bottom: 1px solid #e4e7ed;
 }
@@ -159,7 +163,13 @@ const activeMenu = computed(() => {
 }
 
 .main-content {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
   padding: 24px;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: auto;
   background: #f4f6f9;
 }
 </style>
