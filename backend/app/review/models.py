@@ -30,6 +30,7 @@ class ChunkEntitySnapshot(BaseModel):
     entity_type: str
     evidence_text: str = ""
     rejected: bool = False
+    approved: bool = False
 
 
 class ChunkEntitySave(BaseModel):

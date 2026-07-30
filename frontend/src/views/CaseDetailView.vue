@@ -155,7 +155,7 @@ const loadDetail = async (): Promise<void> => {
 
 const goBack = async (): Promise<void> => {
   await router.push({
-    name: 'case-history',
+    name: 'case-create',
   })
 }
 
@@ -241,7 +241,7 @@ watch(
 
       <div class="heading-actions">
         <el-button @click="goBack">
-          返回历史病例
+          返回病例录入
         </el-button>
 
         <el-button
@@ -274,7 +274,7 @@ watch(
       >
         <template #extra>
           <el-button @click="goBack">
-            返回历史病例
+            返回病例录入
           </el-button>
 
           <el-button

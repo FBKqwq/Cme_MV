@@ -88,4 +88,57 @@ describe("buildHighlightSegments", () => {
 
     expect(segments[0].entity?.entity_id).toBe("E-rejected");
   });
+
+  it("treats a manual approval as accepted without changing machine status", () => {
+    const manuallyApproved = entity("口腔溃疡");
+    manuallyApproved.status = "review";
+    manuallyApproved._review.approved = true;
+
+    const segments = buildHighlightSegments("口腔溃疡", [manuallyApproved]);
+
+    expect(segments[0].entity?._review.approved).toBe(true);
+    expect(segments[0].entity?.status).toBe("review");
+  });
+
+  it("marks the selected entity evidence without losing the entity segment", () => {
+    const text = "主要表现为反复发作的口腔溃疡、生殖器溃疡。";
+    const selected = entity("口腔溃疡", "反复发作的口腔溃疡");
+
+    const segments = buildHighlightSegments(text, [selected], selected.entity_id);
+    const evidenceSegments = segments.filter((item) => item.evidence);
+
+    expect(evidenceSegments.map((item) => item.text).join("")).toBe(
+      "反复发作的口腔溃疡",
+    );
+    expect(
+      evidenceSegments.find((item) => item.entity)?.entity?.entity_id,
+    ).toBe(selected.entity_id);
+  });
+
+  it("matches selected evidence across normalized whitespace", () => {
+    const text = "典型表现为肉芽肿性关\n节炎和葡萄膜炎。";
+    const selected = entity(
+      "肉芽肿性关节炎",
+      "典型表现为肉芽肿性关节炎和葡萄膜炎",
+    );
+
+    const segments = buildHighlightSegments(text, [selected], selected.entity_id);
+
+    expect(
+      segments
+        .filter((item) => item.evidence)
+        .map((item) => item.text)
+        .join(""),
+    ).toBe("典型表现为肉芽肿性关\n节炎和葡萄膜炎");
+  });
+
+  it("does not mark evidence when no entity is selected", () => {
+    const selected = entity("口腔溃疡", "反复发作的口腔溃疡");
+    const segments = buildHighlightSegments(
+      "主要表现为反复发作的口腔溃疡。",
+      [selected],
+    );
+
+    expect(segments.some((item) => item.evidence)).toBe(false);
+  });
 });

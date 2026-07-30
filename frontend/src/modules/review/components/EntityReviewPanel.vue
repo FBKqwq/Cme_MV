@@ -6,10 +6,8 @@ import {
   Clock3,
   PencilLine,
   Plus,
-  Redo2,
   Sparkles,
   X,
-  XCircle,
 } from "lucide-vue-next";
 import { computed, nextTick, ref, watch } from "vue";
 import type { ChunkDetail, EntityDraft, EntityRecord } from "../types";
@@ -34,6 +32,8 @@ const emit = defineEmits<{
   save: [entity: EntityRecord];
   reject: [entity: EntityRecord];
   restore: [entity: EntityRecord];
+  approve: [entity: EntityRecord];
+  unapprove: [entity: EntityRecord];
   create: [];
   cancelCreate: [];
   updateDraft: [patch: Partial<EntityDraft>];
@@ -42,16 +42,29 @@ const emit = defineEmits<{
 const nameInput = ref<HTMLInputElement | null>(null);
 const rejectedEntities = computed(() =>
   props.pendingEntities.filter(
-    (entity) => entity._review.deleted || entity.status === "rejected",
+    (entity) =>
+      entity._review.deleted ||
+      (!entity._review.approved && entity.status === "rejected"),
   ),
 );
 const reviewEntities = computed(() =>
   props.pendingEntities.filter(
-    (entity) => !entity._review.deleted && entity.status !== "rejected",
+    (entity) =>
+      !entity._review.deleted &&
+      !entity._review.approved &&
+      entity.status !== "rejected",
+  ),
+);
+const approvedReviewEntities = computed(() =>
+  props.pendingEntities.filter(
+    (entity) =>
+      !entity._review.deleted &&
+      entity._review.approved,
   ),
 );
 const decisionEntities = computed(() => [
   ...rejectedEntities.value,
+  ...approvedReviewEntities.value,
   ...reviewEntities.value,
 ]);
 const editingEntity = computed(() =>
@@ -70,7 +83,7 @@ const lanes = computed(() => [
   {
     key: "decision",
     title: "拒绝与复验",
-    description: `${rejectedEntities.value.length} 拒绝 · ${reviewEntities.value.length} 复验`,
+    description: `${rejectedEntities.value.length} 拒绝 · ${approvedReviewEntities.value.length} 通过 · ${reviewEntities.value.length} 复验`,
     entities: decisionEntities.value,
   },
 ]);
@@ -98,12 +111,19 @@ function evidence(entity: EntityRecord): string {
 }
 
 function reviewState(entity: EntityRecord): "accepted" | "rejected" | "review" {
-  if (entity._review.deleted || entity.status === "rejected") return "rejected";
+  if (entity._review.deleted) return "rejected";
+  if (entity._review.approved) return "accepted";
+  if (entity.status === "rejected") return "rejected";
   return entity.status === "accepted" ? "accepted" : "review";
 }
 
-function stateLabel(entity: EntityRecord): string {
-  const state = reviewState(entity);
+function machineState(entity: EntityRecord): "accepted" | "rejected" | "review" {
+  if (entity.status === "rejected") return "rejected";
+  return entity.status === "accepted" ? "accepted" : "review";
+}
+
+function machineStateLabel(entity: EntityRecord): string {
+  const state = machineState(entity);
   if (state === "rejected") return "拒绝";
   if (state === "accepted") return "接受";
   return "复验";
@@ -176,19 +196,7 @@ function handleEditorKeydown(event: KeyboardEvent) {
             <ChevronDown :size="14" />
           </span>
         </label>
-        <label>
-          <span>作用范围</span>
-          <span class="select-wrap">
-            <select
-              :value="draft.scope"
-              @change="emit('updateDraft', { scope: ($event.target as HTMLSelectElement).value as EntityDraft['scope'] })"
-            >
-              <option value="current">仅当前提及</option>
-              <option value="all">全部同源提及</option>
-            </select>
-            <ChevronDown :size="14" />
-          </span>
-        </label>
+        <div class="edit-scope-note">仅修改当前 Chunk 中的这次提及</div>
         <label class="evidence-field">
           <span>
             证据原文
@@ -332,31 +340,56 @@ function handleEditorKeydown(event: KeyboardEvent) {
                   </span>
                 </div>
                 <div class="entity-meta-row">
-                  <div class="record-status">
-                    <XCircle v-if="reviewState(entity) === 'rejected'" :size="12" />
-                    <CheckCircle2 v-else-if="reviewState(entity) === 'accepted'" :size="12" />
-                    <Clock3 v-else :size="12" />
-                    {{ stateLabel(entity) }}
+                  <div
+                    class="machine-status"
+                    :class="`machine-${machineState(entity)}`"
+                  >
+                    <span class="machine-label">机器判定</span>
+                    <strong>{{ machineStateLabel(entity) }}</strong>
                     <span v-if="entity.confidence != null">
                       · {{ Math.round(entity.confidence * 100) }}%
                     </span>
                   </div>
-                  <button
-                    v-if="entity._review.deleted"
-                    class="text-action restore"
-                    type="button"
-                    @click.stop="emit('restore', entity)"
-                  >
-                    <Redo2 :size="12" />撤销拒绝
-                  </button>
-                  <button
-                    v-else
-                    class="text-action danger"
-                    type="button"
-                    @click.stop="emit('reject', entity)"
-                  >
-                    <XCircle :size="12" />拒绝
-                  </button>
+                  <div class="review-decisions">
+                    <button
+                      v-if="entity._review.deleted"
+                      class="review-action restore"
+                      type="button"
+                      @click.stop="emit('restore', entity)"
+                    >
+                      撤销人工拒绝
+                    </button>
+                    <template v-else>
+                      <button
+                        v-if="entity._review.approved"
+                        class="review-action restore"
+                        type="button"
+                        @click.stop="emit('unapprove', entity)"
+                      >
+                        {{
+                          entity.status === "rejected"
+                            ? "撤销人工接收"
+                            : "撤销人工通过"
+                        }}
+                      </button>
+                      <button
+                        v-else-if="entity.status !== 'accepted'"
+                        class="review-action approve"
+                        type="button"
+                        @click.stop="emit('approve', entity)"
+                      >
+                        {{ entity.status === "rejected" ? "人工接收" : "人工通过" }}
+                      </button>
+                      <button
+                        v-if="entity.status !== 'rejected'"
+                        class="review-action danger"
+                        type="button"
+                        @click.stop="emit('reject', entity)"
+                      >
+                        人工拒绝
+                      </button>
+                    </template>
+                  </div>
                 </div>
               </div>
               <button
@@ -416,7 +449,7 @@ function handleEditorKeydown(event: KeyboardEvent) {
 .entity-card-head,
 .entity-name-row,
 .entity-meta-row,
-.record-status,
+.machine-status,
 .lane-head > div {
   display: flex;
   align-items: center;
@@ -460,6 +493,13 @@ function handleEditorKeydown(event: KeyboardEvent) {
   display: grid;
   grid-template-columns: minmax(0, 1.25fr) minmax(120px, 0.8fr) minmax(120px, 0.75fr);
   gap: 8px;
+}
+
+.edit-scope-note {
+  display: flex;
+  align-items: center;
+  color: var(--text-faint);
+  font-size: 9px;
 }
 
 .create-grid {
@@ -694,11 +734,36 @@ function handleEditorKeydown(event: KeyboardEvent) {
   gap: 5px;
 }
 
-.record-status {
-  gap: 3px;
-  color: var(--state-color);
+.machine-status {
+  --machine-state-color: var(--amber);
+  min-width: 0;
+  gap: 4px;
+  cursor: default;
+  color: var(--text-faint);
   font-size: 8px;
-  font-weight: 650;
+}
+
+.machine-status.machine-accepted {
+  --machine-state-color: var(--teal);
+}
+
+.machine-status.machine-rejected {
+  --machine-state-color: var(--red);
+}
+
+.machine-label {
+  flex: 0 0 auto;
+  padding: 2px 5px;
+  color: #596579;
+  border-radius: 4px;
+  background: #eef1f6;
+  font-weight: 680;
+}
+
+.machine-status strong {
+  color: var(--machine-state-color);
+  font-size: 8px;
+  font-weight: 720;
 }
 
 .quick-edit {
@@ -746,31 +811,48 @@ function handleEditorKeydown(event: KeyboardEvent) {
   font-size: 7px;
 }
 
-.text-action {
+.review-action {
   display: flex;
-  min-height: 20px;
+  min-height: 24px;
   align-items: center;
-  gap: 3px;
-  padding: 0 4px;
+  padding: 0 7px;
   cursor: pointer;
-  color: var(--text-soft);
+  border: 1px solid currentColor;
   border-radius: 6px;
-  background: transparent;
+  background: #fff;
   font-size: 9px;
-  font-weight: 630;
+  font-weight: 680;
 }
 
-.text-action:hover {
-  background: var(--surface-hover);
+.review-decisions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 
-.text-action.accept,
-.text-action.restore {
+.review-action:focus-visible {
+  outline: 2px solid color-mix(in srgb, currentColor 24%, transparent);
+  outline-offset: 1px;
+}
+
+.review-action.restore,
+.review-action.approve {
   color: var(--teal);
+  border-color: color-mix(in srgb, var(--teal) 45%, transparent);
 }
 
-.text-action.danger {
+.review-action.restore:hover,
+.review-action.approve:hover {
+  background: color-mix(in srgb, var(--teal) 8%, #fff);
+}
+
+.review-action.danger {
   color: var(--red);
+  border-color: color-mix(in srgb, var(--red) 42%, transparent);
+}
+
+.review-action.danger:hover {
+  background: color-mix(in srgb, var(--red) 7%, #fff);
 }
 
 .lane-empty {

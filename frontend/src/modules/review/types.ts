@@ -6,7 +6,7 @@ export interface EntityDraft {
   name: string;
   entity_type: string;
   evidence_text: string;
-  scope: "current" | "all";
+  scope: "current";
 }
 
 export interface RelationDraft {
@@ -21,6 +21,7 @@ export interface ReviewMeta {
   deleted: boolean;
   added: boolean;
   modified: boolean;
+  approved?: boolean;
   scope?: "current" | "all";
   version?: number;
 }
@@ -118,6 +119,7 @@ export interface ChunkEntitySnapshot {
   entity_type: string;
   evidence_text: string;
   rejected: boolean;
+  approved: boolean;
 }
 
 export interface Conflict {

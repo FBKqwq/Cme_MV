@@ -33,7 +33,8 @@ def load_repository(data_root: Path | None = None) -> None:
             result_root=root / "state" / "results",
             export_root=root / "state" / "exports",
             schema_path=(
-                root / "current"
+                root 
+                / "current"
                 / "graph_property_schema_v3_6.json"
             ),
         )

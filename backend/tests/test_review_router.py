@@ -45,3 +45,19 @@ def test_review_health_is_ok_with_repository(monkeypatch, tmp_path) -> None:
     assert pdf.status_code == 200
     assert pdf.headers["content-type"] == "application/pdf"
     assert pdf.headers["content-disposition"].startswith("inline;")
+
+
+def test_load_repository_uses_current_data_directory(monkeypatch, tmp_path) -> None:
+    from tests.test_review_repository import make_task
+
+    seeded_repository = make_task(tmp_path)
+    review_root = tmp_path / "data" / "review"
+    monkeypatch.setattr(review_module, "repository", None)
+    monkeypatch.setattr(review_module, "startup_error", None)
+
+    review_module.load_repository(review_root)
+
+    assert review_module.startup_error is None
+    assert review_module.repository is not None
+    assert review_module.repository.inbox_root == seeded_repository.inbox_root
+    assert review_module.repository.schema_path == seeded_repository.schema_path
