@@ -45,6 +45,12 @@ import type {
 
 const router = useRouter();
 
+interface ReviewPdfExportResult {
+  success: boolean;
+  message: string;
+  file_name: string;
+  download_url: string;
+}
 const batches = ref<ReviewBatch[]>([]);
 const activeBatch = ref(localStorage.getItem("review-active-batch") || "1");
 const batchSwitching = ref(false);
@@ -65,6 +71,7 @@ const selectedPdf = ref("");
 const rightCollapsed = ref(false);
 const pdfOpen = ref(false);
 const saveState = ref<SaveState>("idle");
+const exportingPendingPdf = ref(false);
 const entityDraftDirty = ref(false);
 const chunkSwitching = ref(false);
 const savingLabel = computed(() => {
@@ -964,7 +971,49 @@ async function downloadDraft() {
   if (!(await flushEntityDraft())) return;
   window.location.assign(reviewPath("/api/review/export"));
 }
+async function exportPendingReviewPdf() {
+  if (exportingPendingPdf.value) return;
 
+  // 先保存当前页面尚未提交的修改
+  if (!(await flushEntityDraft())) {
+    showToast("当前修改尚未保存，暂时无法导出");
+    return;
+  }
+
+  exportingPendingPdf.value = true;
+
+  try {
+    showToast("正在生成未复验实体 PDF，请稍候");
+
+    const result = await api<ReviewPdfExportResult>(
+        "/api/review/export-pdf-via-fastgpt",
+        {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+          },
+          timeoutMs: 180_000,
+        },
+    );
+
+    if (!result.success) {
+      throw new Error(result.message || "PDF 生成失败");
+    }
+
+    if (!result.download_url) {
+      throw new Error("后端没有返回 PDF 下载地址");
+    }
+
+    showToast(result.message || "医师复验 PDF 已生成");
+
+    // 创建临时链接并触发下载
+    window.location.assign(result.download_url);
+  } catch (error) {
+    showToast(`导出失败：${errorText(error)}`);
+  } finally {
+    exportingPendingPdf.value = false;
+  }
+}
 async function leaveReview() {
   if (!(await flushEntityDraft())) return;
   await router.push("/");
@@ -1056,17 +1105,19 @@ onBeforeUnmount(() => {
 <template>
   <div class="review-shell">
     <ReviewHeader
-      :task="task"
-      :batches="batches"
-      :active-batch="activeBatch"
-      :batch-switching="batchSwitching"
-      :save-state="saveState"
-      :saving-label="savingLabel"
-      @back="leaveReview"
-      @batch="selectBatch"
-      @import="importReview"
-      @export="downloadDraft"
-      @finalize="finalizeReview"
+        :task="task"
+        :batches="batches"
+        :active-batch="activeBatch"
+        :batch-switching="batchSwitching"
+        :save-state="saveState"
+        :saving-label="savingLabel"
+        :exporting-pending-pdf="exportingPendingPdf"
+        @back="leaveReview"
+        @batch="selectBatch"
+        @import="importReview"
+        @export="downloadDraft"
+        @export-pending-pdf="exportPendingReviewPdf"
+        @finalize="finalizeReview"
     />
 
     <main v-if="loading" class="workspace loading-layout" aria-busy="true">

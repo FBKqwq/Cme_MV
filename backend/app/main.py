@@ -1,6 +1,9 @@
 from collections import Counter
 from contextlib import asynccontextmanager
-
+from .review.fastgpt_export_router import (
+    router as fastgpt_export_router,
+)
+from .review.export_router import router as review_export_router
 from fastapi import (
     BackgroundTasks,
     FastAPI,
@@ -97,8 +100,8 @@ app = FastAPI(
     description="医院病人诊断辅助预测系统后端接口",
     lifespan=lifespan,
 )
-
-
+app.include_router(fastgpt_export_router)
+app.include_router(review_export_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
