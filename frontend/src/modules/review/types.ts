@@ -2,6 +2,18 @@ export type SaveState = "idle" | "dirty" | "saving" | "saved" | "error";
 export type ReviewTab = "entities" | "relationships";
 export type EntityListFilter = "pending" | "accepted";
 
+export interface ReviewBatch {
+  id: string;
+  label: string;
+  status: "ready" | "degraded";
+  error: string;
+}
+
+export interface ReviewBatchList {
+  items: ReviewBatch[];
+  default_batch: string;
+}
+
 export interface EntityDraft {
   name: string;
   entity_type: string;

@@ -14,7 +14,12 @@ import {
   ref,
 } from "vue";
 import { onBeforeRouteLeave, useRouter } from "vue-router";
-import { ApiError, api, mutation } from "../modules/review/api";
+import {
+  ApiError,
+  api,
+  mutation,
+  type ApiRequestInit,
+} from "../modules/review/api";
 import EntityReviewPanel from "../modules/review/components/EntityReviewPanel.vue";
 import EvidencePane from "../modules/review/components/EvidencePane.vue";
 import RelationshipReviewPanel from "../modules/review/components/RelationshipReviewPanel.vue";
@@ -31,6 +36,8 @@ import type {
   EntityRecord,
   RelationDraft,
   RelationshipRecord,
+  ReviewBatch,
+  ReviewBatchList,
   ReviewTab,
   SaveState,
   TaskInfo,
@@ -38,6 +45,9 @@ import type {
 
 const router = useRouter();
 
+const batches = ref<ReviewBatch[]>([]);
+const activeBatch = ref(localStorage.getItem("review-active-batch") || "1");
+const batchSwitching = ref(false);
 const task = ref<TaskInfo | null>(null);
 const chunks = ref<ChunkSummary[]>([]);
 const detail = ref<ChunkDetail | null>(null);
@@ -58,6 +68,7 @@ const saveState = ref<SaveState>("idle");
 const entityDraftDirty = ref(false);
 const chunkSwitching = ref(false);
 const savingLabel = computed(() => {
+  if (batchSwitching.value) return "正在切换批次";
   if (saveState.value === "saving" && chunkSwitching.value) {
     return "正在保存，完成后自动切换";
   }
@@ -105,10 +116,22 @@ const activeChunkIndex = computed(() =>
   chunks.value.findIndex((item) => item.chunk_id === activeChunkId.value),
 );
 const currentSummary = computed(() => chunks.value[activeChunkIndex.value]);
+function reviewPath(path: string, batchId = activeBatch.value): string {
+  const separator = path.includes("?") ? "&" : "?";
+  return `${path}${separator}batch=${encodeURIComponent(batchId)}`;
+}
+
+function reviewApi<T>(
+  path: string,
+  options: ApiRequestInit = {},
+): Promise<T> {
+  return api<T>(reviewPath(path), options);
+}
+
 const reviewPdfUrl = computed(() => {
   const documentId = currentSummary.value?._doc_id;
   if (!documentId) return "";
-  return `/api/review/pdf/${encodeURIComponent(documentId)}`;
+  return reviewPath(`/api/review/pdf/${encodeURIComponent(documentId)}`);
 });
 const currentPdfAvailable = computed(() => {
   const documentId = currentSummary.value?._doc_id;
@@ -240,8 +263,10 @@ function errorText(error: unknown): string {
 
 async function loadTaskAndChunks(selectInitial = false) {
   const [taskResult, chunkResult] = await Promise.all([
-    api<TaskInfo>("/api/review/task"),
-    api<{ items: ChunkSummary[] }>("/api/review/chunks"),
+    reviewApi<TaskInfo>("/api/review/task", { timeoutMs: 120_000 }),
+    reviewApi<{ items: ChunkSummary[] }>("/api/review/chunks", {
+      timeoutMs: 120_000,
+    }),
   ]);
   task.value = taskResult;
   chunks.value = chunkResult.items;
@@ -259,7 +284,7 @@ async function loadChunk(chunkId: string): Promise<boolean> {
   detail.value = null;
   errorMessage.value = "";
   try {
-    const result = await api<ChunkDetail>(
+    const result = await reviewApi<ChunkDetail>(
       `/api/review/chunks/${encodeURIComponent(chunkId)}`,
     );
     if (requestId !== detailRequestId) return false;
@@ -274,6 +299,7 @@ async function loadChunk(chunkId: string): Promise<boolean> {
     relationEditingId.value = "";
     showAddEntity.value = false;
     showAddRelation.value = false;
+    syncCurrentSummary();
     return true;
   } catch (error) {
     if (requestId !== detailRequestId) return false;
@@ -282,6 +308,43 @@ async function loadChunk(chunkId: string): Promise<boolean> {
   } finally {
     if (requestId === detailRequestId) detailLoading.value = false;
   }
+}
+
+function syncTaskProgress() {
+  if (!task.value) return;
+  const approved = chunks.value.filter((item) => item.approved).length;
+  task.value.progress.approved = approved;
+  task.value.progress.issues = chunks.value.reduce(
+    (total, item) => total + item.issue_count,
+    0,
+  );
+  task.value.progress.modified = chunks.value.filter(
+    (item) => item.has_changes,
+  ).length;
+  task.value.progress.percent = task.value.progress.total
+    ? Math.round((approved / task.value.progress.total) * 100)
+    : 0;
+}
+
+function syncCurrentSummary(forceChanged = false) {
+  if (!detail.value) return;
+  const summary = currentSummary.value;
+  if (!summary) return;
+  summary.entity_count = detail.value.entities.filter(
+    (entity) => !entity._review.deleted,
+  ).length;
+  summary.relation_count = detail.value.relationships.filter(
+    (relation) => !relation._review.deleted,
+  ).length;
+  summary.issue_count = detail.value.review.issue_count;
+  summary.approved = detail.value.review.status === "approved";
+  summary.has_changes = detail.value.review.has_changes || forceChanged;
+  summary.status = summary.approved
+    ? "approved"
+    : summary.has_changes
+      ? "modified"
+      : "pending";
+  syncTaskProgress();
 }
 
 async function selectChunk(chunkId: string): Promise<boolean> {
@@ -326,9 +389,48 @@ async function selectPdf(sourceTitle: string) {
   }
 }
 
+function resetBatchWorkspace() {
+  detailRequestId += 1;
+  task.value = null;
+  chunks.value = [];
+  detail.value = null;
+  activeChunkId.value = "";
+  selectedPdf.value = "";
+  selectedEntityId.value = "";
+  selectedRelationId.value = "";
+  selectedEvidence.value = "";
+  errorMessage.value = "";
+  pdfOpen.value = false;
+  entityDraftDirty.value = false;
+}
+
+async function loadBatchOptions() {
+  const result = await api<ReviewBatchList>("/api/review/batches", {
+    timeoutMs: 30_000,
+  });
+  batches.value = result.items;
+  const selected = batches.value.find(
+    (batch) => batch.id === activeBatch.value && batch.status === "ready",
+  );
+  if (!selected) {
+    const fallback =
+      batches.value.find(
+        (batch) =>
+          batch.id === result.default_batch && batch.status === "ready",
+      ) || batches.value.find((batch) => batch.status === "ready");
+    activeBatch.value = fallback?.id || "";
+  }
+  if (!activeBatch.value) {
+    throw new Error("未发现可用的复验批次");
+  }
+  localStorage.setItem("review-active-batch", activeBatch.value);
+}
+
 async function bootstrap() {
   loading.value = true;
+  errorMessage.value = "";
   try {
+    if (!batches.value.length) await loadBatchOptions();
     await loadTaskAndChunks(true);
     if (activeChunkId.value) await loadChunk(activeChunkId.value);
   } catch (error) {
@@ -338,12 +440,44 @@ async function bootstrap() {
   }
 }
 
+async function selectBatch(batchId: string) {
+  if (
+    batchId === activeBatch.value ||
+    batchSwitching.value ||
+    chunkSwitching.value
+  ) {
+    return;
+  }
+  const selected = batches.value.find(
+    (batch) => batch.id === batchId && batch.status === "ready",
+  );
+  if (!selected) {
+    showToast("该批次数据尚未准备好");
+    return;
+  }
+  if (!(await flushEntityDraft())) return;
+
+  batchSwitching.value = true;
+  loading.value = true;
+  activeBatch.value = batchId;
+  localStorage.setItem("review-active-batch", batchId);
+  resetBatchWorkspace();
+  try {
+    await loadTaskAndChunks(true);
+    if (activeChunkId.value) await loadChunk(activeChunkId.value);
+    showToast(`已切换至${selected.label}`);
+  } catch (error) {
+    errorMessage.value = errorText(error);
+  } finally {
+    loading.value = false;
+    batchSwitching.value = false;
+  }
+}
+
 async function refreshAfterMutation(preferredId?: string, kind?: ReviewTab) {
-  const [, loaded] = await Promise.all([
-    loadTaskAndChunks(),
-    loadChunk(activeChunkId.value),
-  ]);
+  const loaded = await loadChunk(activeChunkId.value);
   if (!loaded) throw new Error(errorMessage.value || "当前 Chunk 重新加载失败");
+  syncCurrentSummary(true);
   if (preferredId && kind === "entities") selectedEntityId.value = preferredId;
   if (preferredId && kind === "relationships") selectedRelationId.value = preferredId;
 }
@@ -395,7 +529,7 @@ async function runEntityDraftFlush(): Promise<boolean> {
     const savingChunkId = activeChunkId.value;
     beginSaving();
     try {
-      const result = await api<{ version: number; changed: number }>(
+      const result = await reviewApi<{ version: number; changed: number }>(
         `/api/review/chunks/${encodeURIComponent(savingChunkId)}/entities`,
         {
           ...mutation("PUT", {
@@ -406,6 +540,7 @@ async function runEntityDraftFlush(): Promise<boolean> {
       );
       savingDetail.version = result.version;
       if (task.value) task.value.version = result.version;
+      if (result.changed) syncCurrentSummary(true);
       if (entityDraftRevision === revision) {
         entityDraftDirty.value = false;
         finishSaving();
@@ -561,7 +696,7 @@ async function createEntity() {
     if (!(await flushEntityDraft())) return;
     let createdId = "";
     beginSaving();
-    const result = await api<{ entity_id: string; version: number }>(
+    const result = await reviewApi<{ entity_id: string; version: number }>(
       "/api/review/entities",
       {
         ...mutation("POST", {
@@ -588,7 +723,7 @@ async function saveRelation(relation: RelationshipRecord) {
   try {
     await performMutation(
       () =>
-        api(
+        reviewApi(
           `/api/review/relationships/${encodeURIComponent(relation.relation_id)}`,
           {
             ...mutation("PATCH", {
@@ -617,7 +752,7 @@ async function approveRelation(relation: RelationshipRecord) {
   try {
     await performMutation(
       () =>
-        api(
+        reviewApi(
           `/api/review/relationships/${encodeURIComponent(relation.relation_id)}`,
           {
             ...mutation("PATCH", {
@@ -640,7 +775,7 @@ async function removeRelation(relation: RelationshipRecord) {
   try {
     await performMutation(
       () =>
-        api(
+        reviewApi(
           `/api/review/relationships/${encodeURIComponent(relation.relation_id)}`,
           {
             ...mutation("DELETE", {
@@ -664,7 +799,7 @@ async function restoreRelation(relation: RelationshipRecord) {
   try {
     await performMutation(
       () =>
-        api(
+        reviewApi(
           `/api/review/relationships/${encodeURIComponent(relation.relation_id)}/restore`,
           {
             ...mutation("POST", {
@@ -708,7 +843,7 @@ async function createRelation() {
   try {
     if (!(await flushEntityDraft())) return;
     beginSaving();
-    const result = await api<{ relation_id: string; version: number }>(
+    const result = await reviewApi<{ relation_id: string; version: number }>(
       "/api/review/relationships",
       {
         ...mutation("POST", {
@@ -732,7 +867,7 @@ async function approveAndNext() {
   if (!(await flushEntityDraft())) return;
   beginSaving();
   try {
-    await api(
+    await reviewApi(
       `/api/review/chunks/${encodeURIComponent(activeChunkId.value)}/approve`,
       mutation("POST", { base_version: detail.value.version }),
     );
@@ -778,14 +913,14 @@ async function finalizeReview() {
   if (!(await flushEntityDraft())) return;
   beginSaving();
   try {
-    await api("/api/review/finalize", {
+    await reviewApi("/api/review/finalize", {
       ...mutation("POST", {
         base_version: detail.value.version,
         chunk_id: activeChunkId.value,
       }),
     });
     finishSaving();
-    window.location.assign("/api/review/export?final=true");
+    window.location.assign(reviewPath("/api/review/export?final=true"));
   } catch (error) {
     failSaving(error);
   }
@@ -803,7 +938,11 @@ async function importReview(event: Event) {
     if (!(await flushEntityDraft())) return;
     beginSaving();
     const arrayBuffer = await file.arrayBuffer();
-    const result = await api<{ message: string; version: number; counts: Record<string, number> }>(
+    const result = await reviewApi<{
+      message: string;
+      version: number;
+      counts: Record<string, number>;
+    }>(
       "/api/review/import",
       {
         method: "POST",
@@ -823,7 +962,7 @@ async function importReview(event: Event) {
 
 async function downloadDraft() {
   if (!(await flushEntityDraft())) return;
-  window.location.assign("/api/review/export");
+  window.location.assign(reviewPath("/api/review/export"));
 }
 
 async function leaveReview() {
@@ -918,9 +1057,13 @@ onBeforeUnmount(() => {
   <div class="review-shell">
     <ReviewHeader
       :task="task"
+      :batches="batches"
+      :active-batch="activeBatch"
+      :batch-switching="batchSwitching"
       :save-state="saveState"
       :saving-label="savingLabel"
       @back="leaveReview"
+      @batch="selectBatch"
       @import="importReview"
       @export="downloadDraft"
       @finalize="finalizeReview"

@@ -168,9 +168,14 @@ function chunkButton(wrapper: ReturnType<typeof mount>, title: string) {
   return button;
 }
 
+function withoutBatch(path: string) {
+  return path.replace(/[?&]batch=[^&]+/, "");
+}
+
 describe("KnowledgeReviewView entity persistence", () => {
   beforeEach(() => {
     apiMock.mockReset();
+    localStorage.clear();
   });
 
   it("saves a review entity as manually approved while preserving machine status", async () => {
@@ -181,18 +186,27 @@ describe("KnowledgeReviewView entity persistence", () => {
       | undefined;
 
     apiMock.mockImplementation((path: string, options?: RequestInit) => {
-      if (path === "/api/review/task") return Promise.resolve(task);
-      if (path === "/api/review/chunks") {
+      const endpoint = withoutBatch(path);
+      if (endpoint === "/api/review/batches") {
+        return Promise.resolve({
+          items: [
+            { id: "1", label: "第1批复验", status: "ready", error: "" },
+          ],
+          default_batch: "1",
+        });
+      }
+      if (endpoint === "/api/review/task") return Promise.resolve(task);
+      if (endpoint === "/api/review/chunks") {
         return Promise.resolve({ items: chunks });
       }
-      if (path === "/api/review/chunks/CHUNK_01" && !options?.method) {
+      if (endpoint === "/api/review/chunks/CHUNK_01" && !options?.method) {
         return Promise.resolve(chunkDetail("CHUNK_01"));
       }
-      if (path === "/api/review/chunks/CHUNK_02" && !options?.method) {
+      if (endpoint === "/api/review/chunks/CHUNK_02" && !options?.method) {
         return Promise.resolve(chunkDetail("CHUNK_02", 1));
       }
       if (
-        path === "/api/review/chunks/CHUNK_01/entities" &&
+        endpoint === "/api/review/chunks/CHUNK_01/entities" &&
         options?.method === "PUT"
       ) {
         savedBody = JSON.parse(String(options.body));
@@ -223,18 +237,27 @@ describe("KnowledgeReviewView entity persistence", () => {
     let saveCount = 0;
 
     apiMock.mockImplementation((path: string, options?: RequestInit) => {
-      if (path === "/api/review/task") return Promise.resolve(task);
-      if (path === "/api/review/chunks") {
+      const endpoint = withoutBatch(path);
+      if (endpoint === "/api/review/batches") {
+        return Promise.resolve({
+          items: [
+            { id: "1", label: "第1批复验", status: "ready", error: "" },
+          ],
+          default_batch: "1",
+        });
+      }
+      if (endpoint === "/api/review/task") return Promise.resolve(task);
+      if (endpoint === "/api/review/chunks") {
         return Promise.resolve({ items: chunks });
       }
-      if (path === "/api/review/chunks/CHUNK_01" && !options?.method) {
+      if (endpoint === "/api/review/chunks/CHUNK_01" && !options?.method) {
         return Promise.resolve(chunkDetail("CHUNK_01"));
       }
-      if (path === "/api/review/chunks/CHUNK_02" && !options?.method) {
+      if (endpoint === "/api/review/chunks/CHUNK_02" && !options?.method) {
         return Promise.resolve(chunkDetail("CHUNK_02", 2));
       }
       if (
-        path === "/api/review/chunks/CHUNK_01/entities" &&
+        endpoint === "/api/review/chunks/CHUNK_01/entities" &&
         options?.method === "PUT"
       ) {
         savedBodies.push(JSON.parse(String(options.body)));
@@ -271,14 +294,23 @@ describe("KnowledgeReviewView entity persistence", () => {
 
   it("restores the previous Chunk when the target Chunk fails to load", async () => {
     apiMock.mockImplementation((path: string, options?: RequestInit) => {
-      if (path === "/api/review/task") return Promise.resolve(task);
-      if (path === "/api/review/chunks") {
+      const endpoint = withoutBatch(path);
+      if (endpoint === "/api/review/batches") {
+        return Promise.resolve({
+          items: [
+            { id: "1", label: "第1批复验", status: "ready", error: "" },
+          ],
+          default_batch: "1",
+        });
+      }
+      if (endpoint === "/api/review/task") return Promise.resolve(task);
+      if (endpoint === "/api/review/chunks") {
         return Promise.resolve({ items: chunks });
       }
-      if (path === "/api/review/chunks/CHUNK_01" && !options?.method) {
+      if (endpoint === "/api/review/chunks/CHUNK_01" && !options?.method) {
         return Promise.resolve(chunkDetail("CHUNK_01"));
       }
-      if (path === "/api/review/chunks/CHUNK_02" && !options?.method) {
+      if (endpoint === "/api/review/chunks/CHUNK_02" && !options?.method) {
         return Promise.reject(new Error("Chunk 加载失败"));
       }
       throw new Error(`Unexpected API call: ${path}`);
@@ -291,5 +323,39 @@ describe("KnowledgeReviewView entity persistence", () => {
     expect(wrapper.text()).toContain("切换失败：Chunk 加载失败");
     expect(wrapper.text()).toContain("待复验实体");
     expect(chunkButton(wrapper, "第一节").classes()).toContain("active");
+  });
+
+  it("reloads the workspace with the selected batch parameter", async () => {
+    const requestedPaths: string[] = [];
+    apiMock.mockImplementation((path: string) => {
+      requestedPaths.push(path);
+      const endpoint = withoutBatch(path);
+      if (endpoint === "/api/review/batches") {
+        return Promise.resolve({
+          items: [
+            { id: "1", label: "第1批复验", status: "ready", error: "" },
+            { id: "2", label: "第2批复验", status: "ready", error: "" },
+          ],
+          default_batch: "1",
+        });
+      }
+      if (endpoint === "/api/review/task") return Promise.resolve(task);
+      if (endpoint === "/api/review/chunks") {
+        return Promise.resolve({ items: chunks });
+      }
+      if (endpoint === "/api/review/chunks/CHUNK_01") {
+        return Promise.resolve(chunkDetail("CHUNK_01"));
+      }
+      throw new Error(`Unexpected API call: ${path}`);
+    });
+
+    const wrapper = await mountReview();
+    await wrapper.get('[aria-label="切换复验批次"]').setValue("2");
+    await flushPromises();
+
+    expect(requestedPaths).toContain("/api/review/task?batch=2");
+    expect(requestedPaths).toContain("/api/review/chunks?batch=2");
+    expect(requestedPaths).toContain("/api/review/chunks/CHUNK_01?batch=2");
+    expect(localStorage.getItem("review-active-batch")).toBe("2");
   });
 });

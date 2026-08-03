@@ -12,20 +12,28 @@ import {
   Upload,
   AlertCircle,
 } from "lucide-vue-next";
-import type { SaveState, TaskInfo } from "../types";
+import type { ReviewBatch, SaveState, TaskInfo } from "../types";
 
 defineProps<{
   task: TaskInfo | null;
+  batches: ReviewBatch[];
+  activeBatch: string;
+  batchSwitching: boolean;
   saveState: SaveState;
   savingLabel: string;
 }>();
 
 const emit = defineEmits<{
   back: [];
+  batch: [batchId: string];
   import: [event: Event];
   export: [];
   finalize: [];
 }>();
+
+function selectBatch(event: Event) {
+  emit("batch", (event.target as HTMLSelectElement).value);
+}
 </script>
 
 <template>
@@ -70,6 +78,25 @@ const emit = defineEmits<{
     </div>
 
     <div class="topbar-actions">
+      <label class="batch-picker">
+        <span>复验批次</span>
+        <select
+          aria-label="切换复验批次"
+          :value="activeBatch"
+          :disabled="batchSwitching || saveState === 'saving'"
+          @change="selectBatch"
+        >
+          <option
+            v-for="batch in batches"
+            :key="batch.id"
+            :value="batch.id"
+            :disabled="batch.status !== 'ready'"
+          >
+            {{ batch.label }}
+          </option>
+        </select>
+      </label>
+
       <div class="save-indicator" :class="saveState" role="status">
         <LoaderCircle v-if="saveState === 'saving'" :size="14" class="spin" />
         <CheckCircle2 v-else-if="saveState === 'saved'" :size="14" />
@@ -279,6 +306,40 @@ const emit = defineEmits<{
   gap: 8px;
 }
 
+.batch-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-faint);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.batch-picker select {
+  height: 34px;
+  min-width: 108px;
+  padding: 0 27px 0 10px;
+  color: #35405a;
+  cursor: pointer;
+  border: 1px solid #d9dfeb;
+  border-radius: 9px;
+  outline: none;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.batch-picker select:hover:not(:disabled),
+.batch-picker select:focus-visible {
+  border-color: #aeb8eb;
+  box-shadow: 0 0 0 3px rgba(89, 100, 223, 0.09);
+}
+
+.batch-picker select:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
 .save-indicator {
   gap: 6px;
   color: var(--text-faint);
@@ -383,6 +444,7 @@ const emit = defineEmits<{
   .contract-badge,
   .header-progress-issues,
   .header-progress-clear,
+  .batch-picker > span,
   .utility-menu summary span {
     display: none;
   }

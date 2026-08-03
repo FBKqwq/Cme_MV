@@ -9,8 +9,9 @@ REVIEW_DATA_ROOT = Path(
         str(PROJECT_ROOT / "data" / "review"),
     )
 ).resolve()
-INBOX_ROOT = REVIEW_DATA_ROOT / "current"
-REVIEW_ROOT = REVIEW_DATA_ROOT / "state"
+DEFAULT_BATCH_ROOT = REVIEW_DATA_ROOT / "1"
+INBOX_ROOT = DEFAULT_BATCH_ROOT / "current"
+REVIEW_ROOT = DEFAULT_BATCH_ROOT / "state"
 RESULT_ROOT = REVIEW_ROOT / "results"
 EXPORT_ROOT = REVIEW_ROOT / "exports"
 SCHEMA_PATH = INBOX_ROOT / "graph_property_schema_v3_6.json"
