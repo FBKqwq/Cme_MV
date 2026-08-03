@@ -1,6 +1,8 @@
 import json
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Barrier
 
 import pytest
 from fastapi import HTTPException
@@ -21,6 +23,7 @@ def make_task(
     invalid_chunk: bool = False,
     with_pdf: bool = False,
     with_label_result: bool = False,
+    with_second_document: bool = False,
 ) -> ReviewRepository:
     review_root = tmp_path / "data" / "review"
     inbox = review_root / "current"
@@ -85,6 +88,44 @@ def make_task(
         nodes_dir / "测试共识.entity_nodes.base.jsonl",
         entities,
     )
+    if with_second_document:
+        second_chunks = {
+            "doc_id": "SECOND",
+            "source_title": "第二份共识",
+            "total_pages": 1,
+            "chunks": [
+                {
+                    "chunk_id": "CH01",
+                    "section_title": "诊断",
+                    "page_start": 1,
+                    "page_end": 1,
+                    "text": "第二种疾病可表现为发热。",
+                }
+            ],
+        }
+        (chunks_dir / "第二份共识_chunk.json").write_text(
+            json.dumps(second_chunks, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        write_jsonl(
+            nodes_dir / "第二份共识.entity_nodes.base.jsonl",
+            [
+                {
+                    "entity_id": "S01",
+                    "chunk_id": "CH01",
+                    "entity_type": "sub_diseases",
+                    "name": "第二种疾病",
+                    "evidence_text": "第二种疾病",
+                },
+                {
+                    "entity_id": "S02",
+                    "chunk_id": "CH01",
+                    "entity_type": "symptoms",
+                    "name": "发热",
+                    "evidence_text": "表现为发热",
+                },
+            ],
+        )
     if with_label_result:
         write_jsonl(
             nodes_dir / "测试共识.entity_label_result.jsonl",
@@ -536,14 +577,16 @@ def test_entity_edit_creates_conflict_and_rejects_stale_version(
     assert edited["name"] == "复发性口腔溃疡"
     assert edited["review_canonical_id"].startswith("REVIEW_CANON_")
     assert detail["relationships"] == []
-    result_file = repository.result_root / "测试共识.review.json"
+    result_file = repository._chunk_delta_path("TEST", "TEST_CH01")
     persisted = json.loads(result_file.read_text(encoding="utf-8"))
     persisted_entity = next(
         item for item in persisted["entities"] if item["entity_id"] == "E02"
     )
-    assert persisted_entity["name"] == "口腔溃疡"
+    assert persisted["format"] == "chunk-review-delta-v1"
     assert persisted_entity["review_flag"] == "modified"
     assert persisted_entity["corrected_values"]["name"] == "复发性口腔溃疡"
+    assert "mention_context" not in persisted_entity
+    assert not (repository.result_root / "测试共识.review.json").exists()
     assert not (repository.result_root.parent / "review.sqlite3").exists()
 
     with pytest.raises(HTTPException) as stale:
@@ -557,6 +600,85 @@ def test_entity_edit_creates_conflict_and_rejects_stale_version(
             },
         )
     assert stale.value.status_code == 409
+
+
+def test_different_pdfs_can_save_concurrently_with_independent_versions(
+    tmp_path: Path,
+) -> None:
+    repository = make_task(tmp_path, with_second_document=True)
+    barrier = Barrier(2)
+
+    def save_entity_name(
+        chunk_id: str,
+        target_id: str,
+        target_name: str,
+    ) -> dict:
+        detail = repository.chunk_detail(chunk_id)
+        entities = [
+            {
+                "entity_id": entity["entity_id"],
+                "name": (
+                    target_name
+                    if entity["entity_id"] == target_id
+                    else entity["name"]
+                ),
+                "entity_type": entity["entity_type"],
+                "evidence_text": entity.get("evidence_text") or entity["name"],
+                "rejected": False,
+                "approved": False,
+            }
+            for entity in detail["entities"]
+        ]
+        barrier.wait()
+        return repository.save_chunk_entities(
+            chunk_id,
+            {
+                "base_version": detail["version"],
+                "entities": entities,
+            },
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        first = executor.submit(
+            save_entity_name,
+            "TEST_CH01",
+            "E02",
+            "复发性口腔溃疡",
+        )
+        second = executor.submit(
+            save_entity_name,
+            "SECOND_CH01",
+            "S02",
+            "持续发热",
+        )
+        results = [first.result(), second.result()]
+
+    assert [result["version"] for result in results] == [1, 1]
+    assert repository.document_version("TEST") == 1
+    assert repository.document_version("SECOND") == 1
+    assert repository.chunk_detail("TEST_CH01")["version"] == 1
+    assert repository.chunk_detail("SECOND_CH01")["version"] == 1
+
+    reloaded = ReviewRepository(
+        project_root=tmp_path,
+        inbox_root=repository.inbox_root,
+        result_root=repository.result_root,
+        export_root=repository.export_root,
+        schema_path=repository.schema_path,
+    )
+    first_name = next(
+        entity["name"]
+        for entity in reloaded.chunk_detail("TEST_CH01")["entities"]
+        if entity["entity_id"] == "E02"
+    )
+    second_name = next(
+        entity["name"]
+        for entity in reloaded.chunk_detail("SECOND_CH01")["entities"]
+        if entity["entity_id"] == "S02"
+    )
+
+    assert first_name == "复发性口腔溃疡"
+    assert second_name == "持续发热"
 
 
 def test_soft_delete_restore_and_relation_conflict(tmp_path: Path) -> None:
@@ -602,6 +724,20 @@ def test_entities_do_not_create_synthetic_relationships(tmp_path: Path) -> None:
     assert detail["relationships"] == []
     assert summary["relation_count"] == 0
     assert summary["issue_count"] == 0
+
+
+def test_chunk_detail_omits_heavy_inference_fields(tmp_path: Path) -> None:
+    repository = make_task(tmp_path)
+    repository.entities[0]["mention_context"] = {"trace": "x" * 100_000}
+    repository.entities[0]["llm_views"] = [{"prompt": "y" * 100_000}]
+
+    detail = repository.chunk_detail("TEST_CH01")
+    entity = next(item for item in detail["entities"] if item["entity_id"] == "E01")
+
+    assert entity["name"] == "白塞综合征"
+    assert "mention_context" not in entity
+    assert "llm_views" not in entity
+    assert len(json.dumps(detail, ensure_ascii=False)) < 10_000
 
 
 def test_approve_reload_and_final_export(tmp_path: Path) -> None:

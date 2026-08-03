@@ -29,6 +29,12 @@ describe("ReviewHeader", () => {
     const wrapper = mount(ReviewHeader, {
       props: {
         task,
+        batches: [
+          { id: "1", label: "第1批复验", status: "ready", error: "" },
+          { id: "2", label: "第2批复验", status: "ready", error: "" },
+        ],
+        activeBatch: "1",
+        batchSwitching: false,
         saveState: "idle",
         savingLabel: "修改自动保存",
       },
@@ -40,5 +46,25 @@ describe("ReviewHeader", () => {
     expect(wrapper.get(".header-progress-value").attributes("style")).toContain(
       "width: 15%",
     );
+  });
+
+  it("emits the selected review batch", async () => {
+    const wrapper = mount(ReviewHeader, {
+      props: {
+        task,
+        batches: [
+          { id: "1", label: "第1批复验", status: "ready", error: "" },
+          { id: "2", label: "第2批复验", status: "ready", error: "" },
+        ],
+        activeBatch: "1",
+        batchSwitching: false,
+        saveState: "idle",
+        savingLabel: "修改自动保存",
+      },
+    });
+
+    await wrapper.get('[aria-label="切换复验批次"]').setValue("2");
+
+    expect(wrapper.emitted("batch")).toEqual([["2"]]);
   });
 });

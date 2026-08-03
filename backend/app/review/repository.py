@@ -11,8 +11,9 @@ import zipfile
 from collections import defaultdict
 from copy import deepcopy
 from datetime import datetime, timezone
+from functools import wraps
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable, Iterator, TypeVar
 
 from fastapi import HTTPException
 
@@ -33,18 +34,17 @@ def read_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8-sig"))
 
 
-def read_jsonl(path: Path) -> list[dict[str, Any]]:
-    records: list[dict[str, Any]] = []
+def read_jsonl(path: Path) -> Iterator[dict[str, Any]]:
+    """Stream large JSONL sources instead of materializing a second list."""
     with path.open("r", encoding="utf-8-sig") as handle:
         for line_number, line in enumerate(handle, start=1):
             value = line.strip()
             if not value:
                 continue
             try:
-                records.append(json.loads(value))
+                yield json.loads(value)
             except json.JSONDecodeError as exc:
                 raise ValueError(f"{path.name} 第 {line_number} 行不是合法 JSON") from exc
-    return records
 
 
 def file_sha256(path: Path) -> str:
@@ -55,8 +55,22 @@ def file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+T = TypeVar("T")
+
+
+def with_repository_lock(method: Callable[..., T]) -> Callable[..., T]:
+    """Keep in-memory projections and persisted review deltas transactionally aligned."""
+
+    @wraps(method)
+    def wrapped(self: "ReviewRepository", *args: Any, **kwargs: Any) -> T:
+        with self._mutation_lock:
+            return method(self, *args, **kwargs)
+
+    return wrapped
+
+
 class ReviewRepository:
-    """Immutable source data plus one human-readable review JSON per PDF."""
+    """Immutable source data plus small, per-chunk JSON review deltas."""
 
     ENTITY_LABELS_ZH = {
         "diseases": "疾病",
@@ -92,13 +106,16 @@ class ReviewRepository:
         self.inbox_root = inbox_root or INBOX_ROOT
         self.result_root = result_root or RESULT_ROOT
         self.export_root = export_root or EXPORT_ROOT
+        self.delta_root = self.result_root.parent / "reviews"
         self.schema_path = schema_path or SCHEMA_PATH
         self.result_root.mkdir(parents=True, exist_ok=True)
         self.export_root.mkdir(parents=True, exist_ok=True)
+        self.delta_root.mkdir(parents=True, exist_ok=True)
         self._load_source()
         self._validate_source()
         self._sync_input_hash()
         self._load_or_initialize_results()
+        self._mutation_lock = threading.RLock()
         self._snapshot_lock = threading.RLock()
         self._snapshot: dict[str, Any] | None = None
 
@@ -117,6 +134,38 @@ class ReviewRepository:
             if path.name.endswith(suffix):
                 return path.name[: -len(suffix)]
         return path.stem
+
+    def _normalize_source_entity(
+        self,
+        record: dict[str, Any],
+        document_id: str,
+    ) -> dict[str, Any]:
+        record["_doc_id"] = document_id
+        if not record.get("entity_type"):
+            record["entity_type"] = (
+                record.get("proposed_entity_type")
+                or record.get("fusion_entity_type")
+                or record.get("teacher_candidate_type")
+                or ""
+            )
+        chunk_id = str(record.get("chunk_id", ""))
+        if chunk_id:
+            prefixed = f"{document_id}_{chunk_id}"
+            if prefixed in self.chunk_by_id:
+                record["chunk_id"] = prefixed
+        return record
+
+    def _iter_export_source_entities(self) -> Iterator[dict[str, Any]]:
+        """Rehydrate immutable source rows only for the uncommon export path."""
+        for path in self.entity_source_paths:
+            fixed_document_id = self.entity_source_documents.get(path)
+            for record in read_jsonl(path):
+                document_id = fixed_document_id or str(
+                    record.get("document_id", "")
+                )
+                if document_id not in self.chunk_sources:
+                    document_id = next(iter(self.chunk_sources))
+                yield self._normalize_source_entity(record, document_id)
 
     def _load_source(self) -> None:
         chunks_dir = self.inbox_root / "chunks"
@@ -143,8 +192,12 @@ class ReviewRepository:
             chunks = payload.get("chunks", [])
             if not isinstance(chunks, list):
                 continue
-            source_title = payload.get("source_title", cf.stem)
             doc_id = payload.get("doc_id", f"DOC_{doc_count:03d}")
+            source_title = (
+                payload.get("source_title")
+                or payload.get("doc_id")
+                or self._entity_source_stem(cf)
+            )
             for ch in chunks:
                 orig = str(ch.get("chunk_id", f"CH{len(self.chunks)+1:04d}"))
                 ch["chunk_id"] = f"{doc_id}_{orig}"
@@ -162,6 +215,8 @@ class ReviewRepository:
             raise ValueError("没有加载到任何chunk数据")
 
         self.entities = []
+        self.entity_source_paths: list[Path] = []
+        self.entity_source_documents: dict[Path, str] = {}
         if nodes_dir.exists():
             # Map cleaned document stems to chunk doc_ids
             def _clean_stem(s):
@@ -207,33 +262,26 @@ class ReviewRepository:
             )
             for ef in self.entity_source_paths:
                 matched_doc = _match_document(ef)
+                self.entity_source_documents[ef] = matched_doc
                 for rec in read_jsonl(ef):
-                    rec["_doc_id"] = matched_doc
-                    if not rec.get("entity_type"):
-                        rec["entity_type"] = (
-                            rec.get("proposed_entity_type")
-                            or rec.get("fusion_entity_type")
-                            or rec.get("teacher_candidate_type")
-                            or ""
-                        )
-                    cid = str(rec.get("chunk_id", ""))
-                    if cid:
-                        prefixed = f"{matched_doc}_{cid}"
-                        if prefixed in self.chunk_by_id:
-                            rec["chunk_id"] = prefixed
-                    self.entities.append(rec)
+                    normalized = self._normalize_source_entity(rec, matched_doc)
+                    self.entities.append(self._source_result_entity(normalized))
 
         base_dir = self.inbox_root / "entity_base"
         if not self.entities and base_dir.exists():
-            for ef in sorted(base_dir.glob("*.entity_base.jsonl")):
+            self.entity_source_paths = sorted(
+                base_dir.glob("*.entity_base.jsonl")
+            )
+            for ef in self.entity_source_paths:
                 for rec in read_jsonl(ef):
                     document_id = str(rec.get("document_id", ""))
-                    rec["_doc_id"] = (
+                    matched_doc = (
                         document_id
                         if document_id in self.chunk_sources
                         else next(iter(self.chunk_sources))
                     )
-                    self.entities.append(rec)
+                    normalized = self._normalize_source_entity(rec, matched_doc)
+                    self.entities.append(self._source_result_entity(normalized))
 
         self.entity_by_id = {str(e["entity_id"]): e for e in self.entities}
 
@@ -336,6 +384,14 @@ class ReviewRepository:
         stem = pdf.stem if pdf else str(source.get("title") or document_id)
         return self.result_root / f"{self._safe_result_name(stem)}.review.json"
 
+    def _chunk_delta_path(self, document_id: str, chunk_id: str) -> Path:
+        document_dir = self.delta_root / self._safe_result_name(document_id)
+        return document_dir / f"{self._safe_result_name(chunk_id)}.review.json"
+
+    def _migration_marker_path(self, document_id: str) -> Path:
+        document_dir = self.delta_root / self._safe_result_name(document_id)
+        return document_dir / ".legacy-migrated-v1.json"
+
     def _document_id_for_chunk(self, chunk_id: str) -> str:
         chunk = self.chunk_by_id.get(chunk_id)
         if not chunk:
@@ -371,7 +427,46 @@ class ReviewRepository:
 
     @staticmethod
     def _source_result_entity(entity: dict[str, Any]) -> dict[str, Any]:
-        result = deepcopy(entity)
+        """Keep only fields needed by the mutable review overlay.
+
+        The immutable source JSONL remains the export authority. Copying every
+        diagnostic trace into ``results`` duplicates hundreds of megabytes of
+        source data in each worker and makes ordinary chunk saves compete with
+        paging. Review mutations only need the compact record below.
+        """
+        review_fields = {
+            "_doc_id",
+            "canonical_entity_id",
+            "chunk_id",
+            "confidence",
+            "conflicts",
+            "document_core_disease",
+            "document_id",
+            "end_entity_id",
+            "entity_id",
+            "entity_status",
+            "entity_type",
+            "evidence_mentions",
+            "evidence_span",
+            "evidence_spans",
+            "evidence_text",
+            "name",
+            "relation_id",
+            "relation_type",
+            "review_canonical_id",
+            "section_title",
+            "source_chunk_ids",
+            "source_title",
+            "start_entity_id",
+            "status",
+            "target_chunk_id",
+            "source_chunk_id",
+        }
+        result = {
+            key: deepcopy(value)
+            for key, value in entity.items()
+            if key in review_fields
+        }
         result.update(
             {
                 "review_flag": "pending",
@@ -487,7 +582,9 @@ class ReviewRepository:
         self.results: dict[str, dict[str, Any]] = {}
         for document_id in self.chunk_sources:
             path = self._result_path(document_id)
-            if path.exists():
+            marker = self._migration_marker_path(document_id)
+            legacy_needs_migration = path.exists() and not marker.exists()
+            if legacy_needs_migration:
                 result = self._rebase_document_result(
                     document_id,
                     read_json(path),
@@ -495,12 +592,262 @@ class ReviewRepository:
             else:
                 result = self._new_document_result(document_id)
             self.results[document_id] = result
-            self._atomic_write_json(path, result)
+            self._apply_chunk_deltas(document_id)
+            if legacy_needs_migration:
+                self._persist_all_document_deltas(document_id)
+                self._atomic_write_json(
+                    marker,
+                    {
+                        "format": "legacy-review-migration-v1",
+                        "document_id": document_id,
+                        "legacy_file": path.name,
+                        "migrated_at": utc_now(),
+                    },
+                )
 
     def _save_result(self, document_id: str) -> None:
-        self._atomic_write_json(self._result_path(document_id), self.results[document_id])
+        """Persist only the chunk changed by the current review version."""
+        result = self.results[document_id]
+        version = int(result.get("version", 0))
+        chunk_ids = [
+            str(chunk_id)
+            for chunk_id, review in result.get("chunk_reviews", {}).items()
+            if int(review.get("version", -1)) == version
+        ]
+        if not chunk_ids:
+            chunk_ids = sorted(
+                {
+                    str(event.get("chunk_id"))
+                    for event in result.get("audit_events", [])
+                    if int(event.get("version", -1)) == version
+                    and event.get("chunk_id")
+                }
+            )
+        for chunk_id in chunk_ids:
+            self._persist_chunk_delta(document_id, chunk_id)
         if hasattr(self, "_snapshot"):
             self._snapshot = None
+
+    @staticmethod
+    def _review_record_delta(
+        record: dict[str, Any],
+        *,
+        id_key: str,
+    ) -> dict[str, Any] | None:
+        operation = str(record.get("review_operation") or "source")
+        decision = str(record.get("review_decision") or "pending")
+        version = int(record.get("review_version", 0))
+        if version <= 0 and operation == "source" and decision == "pending":
+            return None
+
+        keys = {
+            id_key,
+            "chunk_id",
+            "source_chunk_id",
+            "target_chunk_id",
+            "source_chunk_ids",
+            "review_flag",
+            "review_decision",
+            "review_operation",
+            "review_scope",
+            "corrected_values",
+            "review_version",
+            "review_updated_at",
+            "restore_metadata",
+        }
+        if operation == "create":
+            keys.update({
+            "document_id",
+            "section_title",
+            "source_title",
+            "entity_type",
+            "name",
+            "evidence_text",
+            "status",
+            "entity_status",
+            "review_canonical_id",
+            "start_entity_id",
+            "end_entity_id",
+            "relation_type",
+            })
+        return {
+            key: deepcopy(value)
+            for key, value in record.items()
+            if key in keys
+        }
+
+    @staticmethod
+    def _compact_audit_event(event: dict[str, Any]) -> dict[str, Any]:
+        def compact_value(value: Any) -> Any:
+            if not isinstance(value, dict):
+                return deepcopy(value)
+            allowed = {
+                "entity_id",
+                "relation_id",
+                "name",
+                "entity_type",
+                "evidence_text",
+                "status",
+                "review_flag",
+                "review_decision",
+                "review_operation",
+                "corrected_values",
+                "rejected",
+                "approved",
+                "start_entity_id",
+                "end_entity_id",
+                "relation_type",
+            }
+            return {
+                key: deepcopy(item)
+                for key, item in value.items()
+                if key in allowed
+            }
+
+        compact = {
+            key: deepcopy(value)
+            for key, value in event.items()
+            if key not in {"before", "after"}
+        }
+        compact["before"] = compact_value(event.get("before"))
+        compact["after"] = compact_value(event.get("after"))
+        return compact
+
+    def _chunk_record_matches(
+        self,
+        record: dict[str, Any],
+        chunk_id: str,
+    ) -> bool:
+        if str(record.get("chunk_id", "")) == chunk_id:
+            return True
+        return chunk_id in self._relation_chunk_ids(record)
+
+    def _chunk_delta_payload(
+        self,
+        document_id: str,
+        chunk_id: str,
+    ) -> dict[str, Any]:
+        result = self.results[document_id]
+
+        def records(collection: str, id_key: str) -> list[dict[str, Any]]:
+            deltas: list[dict[str, Any]] = []
+            for record in result.get(collection, []):
+                if not self._chunk_record_matches(record, chunk_id):
+                    continue
+                delta = self._review_record_delta(record, id_key=id_key)
+                if delta is not None:
+                    deltas.append(delta)
+            return deltas
+
+        return {
+            "format": "chunk-review-delta-v1",
+            "schema_version": self.schema.get("schema_version"),
+            "input_hash": self.input_hash,
+            "document_id": document_id,
+            "chunk_id": chunk_id,
+            "version": int(result.get("version", 0)),
+            "updated_at": result.get("updated_at"),
+            "entities": records("entities", "entity_id"),
+            "canonical_entities": records("canonical_entities", "entity_id"),
+            "relationships": records("relationships", "relation_id"),
+            "chunk_review": deepcopy(
+                result.get("chunk_reviews", {}).get(chunk_id)
+            ),
+            "audit_events": [
+                self._compact_audit_event(event)
+                for event in result.get("audit_events", [])
+                if str(event.get("chunk_id", "")) == chunk_id
+            ],
+        }
+
+    def _persist_chunk_delta(self, document_id: str, chunk_id: str) -> None:
+        self._atomic_write_json(
+            self._chunk_delta_path(document_id, chunk_id),
+            self._chunk_delta_payload(document_id, chunk_id),
+        )
+
+    def _persist_all_document_deltas(self, document_id: str) -> None:
+        result = self.results[document_id]
+        chunk_ids = set(result.get("chunk_reviews", {}))
+        chunk_ids.update(
+            str(record.get("chunk_id"))
+            for collection in ("entities", "canonical_entities", "relationships")
+            for record in result.get(collection, [])
+            if int(record.get("review_version", 0)) > 0
+            and record.get("chunk_id")
+        )
+        for chunk_id in sorted(chunk_ids):
+            self._persist_chunk_delta(document_id, chunk_id)
+
+    @staticmethod
+    def _merge_delta_records(
+        target: list[dict[str, Any]],
+        deltas: list[dict[str, Any]],
+        *,
+        id_key: str,
+    ) -> None:
+        indexed = {
+            str(record.get(id_key, "")): record
+            for record in target
+            if record.get(id_key)
+        }
+        for delta in deltas:
+            record_id = str(delta.get(id_key, ""))
+            if not record_id:
+                continue
+            record = indexed.get(record_id)
+            if record is None:
+                record = {}
+                target.append(record)
+                indexed[record_id] = record
+            record.update(deepcopy(delta))
+
+    def _apply_chunk_deltas(self, document_id: str) -> None:
+        document_dir = self.delta_root / self._safe_result_name(document_id)
+        if not document_dir.exists():
+            return
+        payloads = [
+            read_json(path)
+            for path in document_dir.glob("*.review.json")
+        ]
+        payloads.sort(key=lambda item: int(item.get("version", 0)))
+        result = self.results[document_id]
+        audits_by_sequence = {
+            int(event.get("sequence", 0)): event
+            for event in result.get("audit_events", [])
+        }
+        for payload in payloads:
+            if str(payload.get("document_id", "")) != document_id:
+                continue
+            self._merge_delta_records(
+                result["entities"],
+                payload.get("entities", []),
+                id_key="entity_id",
+            )
+            self._merge_delta_records(
+                result["canonical_entities"],
+                payload.get("canonical_entities", []),
+                id_key="entity_id",
+            )
+            self._merge_delta_records(
+                result["relationships"],
+                payload.get("relationships", []),
+                id_key="relation_id",
+            )
+            chunk_review = payload.get("chunk_review")
+            if chunk_review and payload.get("chunk_id"):
+                result["chunk_reviews"][str(payload["chunk_id"])] = deepcopy(
+                    chunk_review
+                )
+            for event in payload.get("audit_events", []):
+                audits_by_sequence[int(event.get("sequence", 0))] = deepcopy(event)
+            if int(payload.get("version", 0)) >= int(result.get("version", 0)):
+                result["version"] = int(payload.get("version", 0))
+                result["updated_at"] = payload.get("updated_at")
+        result["audit_events"] = [
+            audits_by_sequence[key]
+            for key in sorted(audits_by_sequence)
+        ]
 
     def _validate_source(self) -> None:
         issues: list[str] = []
@@ -554,15 +901,48 @@ class ReviewRepository:
             default=0,
         )
 
-    def _assert_version(self, base_version: int) -> None:
-        current = self.version()
+    def document_version(self, document_id: str) -> int:
+        result = self.results.get(document_id)
+        if result is None:
+            raise HTTPException(status_code=404, detail="未找到该 PDF")
+        return int(result.get("version", 0))
+
+    def _version_token(self) -> tuple[tuple[str, int], ...]:
+        return tuple(
+            sorted(
+                (document_id, int(result.get("version", 0)))
+                for document_id, result in self.results.items()
+            )
+        )
+
+    def _assert_version(
+        self,
+        base_version: int,
+        *,
+        chunk_id: str | None = None,
+    ) -> None:
+        document_id = (
+            self._document_id_for_chunk(chunk_id)
+            if chunk_id is not None
+            else None
+        )
+        current = (
+            self.document_version(document_id)
+            if document_id is not None
+            else self.version()
+        )
         if base_version != current:
             raise HTTPException(
                 status_code=409,
                 detail={
                     "code": "VERSION_CONFLICT",
-                    "message": "数据已在另一标签页更新，请刷新后重试。",
+                    "message": (
+                        "当前 PDF 已被其他审核人更新，请刷新后重试。"
+                        if document_id is not None
+                        else "数据已在另一标签页更新，请刷新后重试。"
+                    ),
                     "current_version": current,
+                    "document_id": document_id,
                 },
             )
 
@@ -602,7 +982,6 @@ class ReviewRepository:
                     "decision": decision,
                     "scope": record.get("review_scope", "current"),
                     "payload_json": json.dumps(payload, ensure_ascii=False),
-                    "before_json": json.dumps(record, ensure_ascii=False),
                     "version": int(record.get("review_version", 0)),
                     "updated_at": record.get("review_updated_at"),
                 }
@@ -629,23 +1008,115 @@ class ReviewRepository:
         }
         return projected
 
+    @staticmethod
+    def _source_review_meta() -> dict[str, Any]:
+        return {
+            "operation": "source",
+            "deleted": False,
+            "added": False,
+            "modified": False,
+            "approved": False,
+        }
+
+    def _project_entity_for_review(
+        self,
+        record: dict[str, Any],
+        row: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        projected = self._entity_detail_dto(record)
+        if row is None:
+            projected["_review"] = self._source_review_meta()
+            return projected
+        projected.update(
+            {
+                key: value
+                for key, value in json.loads(row["payload_json"]).items()
+                if not key.startswith("__restore_")
+            }
+        )
+        projected["_review"] = {
+            "operation": row["operation"],
+            "scope": row["scope"],
+            "version": row["version"],
+            "updated_at": row["updated_at"],
+            "deleted": row["operation"] == "delete",
+            "added": row["operation"] == "create",
+            "modified": row["operation"] in {"update", "delete"},
+            "approved": row.get("decision") == "accepted",
+        }
+        return projected
+
+    def _project_relationship_for_review(
+        self,
+        record: dict[str, Any],
+        row: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        keys = (
+            "relation_id",
+            "chunk_id",
+            "source_chunk_id",
+            "target_chunk_id",
+            "source_chunk_ids",
+            "evidence_mentions",
+            "evidence_spans",
+            "start_entity_id",
+            "end_entity_id",
+            "relation_type",
+            "evidence_text",
+            "status",
+            "confidence",
+            "source_title",
+        )
+        projected = {
+            key: deepcopy(record[key])
+            for key in keys
+            if key in record
+        }
+        if row is None:
+            projected["_review"] = self._source_review_meta()
+            return projected
+        projected.update(
+            {
+                key: value
+                for key, value in json.loads(row["payload_json"]).items()
+                if not key.startswith("__restore_")
+            }
+        )
+        projected["_review"] = {
+            "operation": row["operation"],
+            "scope": row["scope"],
+            "version": row["version"],
+            "updated_at": row["updated_at"],
+            "deleted": row["operation"] == "delete",
+            "added": row["operation"] == "create",
+            "modified": row["operation"] in {"update", "delete"},
+            "approved": row.get("decision") == "accepted",
+        }
+        return projected
+
     def projected_entities(self) -> list[dict[str, Any]]:
         overrides = self._overrides("entity")
         projected: list[dict[str, Any]] = []
         for record in self.entities:
             record_id = str(record["entity_id"])
             row = overrides.get(record_id)
+            projected.append(self._project_entity_for_review(record, row))
+        for record_id, row in overrides.items():
+            if record_id not in self.entity_by_id and row["operation"] == "create":
+                projected.append(self._project_entity_for_review({}, row))
+        return projected
+
+    def projected_export_entities(self) -> list[dict[str, Any]]:
+        overrides = self._overrides("entity")
+        projected: list[dict[str, Any]] = []
+        for record in self._iter_export_source_entities():
+            record_id = str(record["entity_id"])
+            row = overrides.get(record_id)
             if row:
                 projected.append(self._apply_override(record, row))
             else:
                 item = deepcopy(record)
-                item["_review"] = {
-                    "operation": "source",
-                    "deleted": False,
-                    "added": False,
-                    "modified": False,
-                    "approved": False,
-                }
+                item["_review"] = self._source_review_meta()
                 projected.append(item)
         for record_id, row in overrides.items():
             if record_id not in self.entity_by_id and row["operation"] == "create":
@@ -681,17 +1152,23 @@ class ReviewRepository:
         for record in self.relationships:
             record_id = str(record["relation_id"])
             row = overrides.get(record_id)
+            projected.append(self._project_relationship_for_review(record, row))
+        for record_id, row in overrides.items():
+            if record_id not in self.relationship_by_id and row["operation"] == "create":
+                projected.append(self._project_relationship_for_review({}, row))
+        return projected
+
+    def projected_export_relationships(self) -> list[dict[str, Any]]:
+        overrides = self._overrides("relationship")
+        projected: list[dict[str, Any]] = []
+        for record in self.relationships:
+            record_id = str(record["relation_id"])
+            row = overrides.get(record_id)
             if row:
                 projected.append(self._apply_override(record, row))
             else:
                 item = deepcopy(record)
-                item["_review"] = {
-                    "operation": "source",
-                    "deleted": False,
-                    "added": False,
-                    "modified": False,
-                    "approved": False,
-                }
+                item["_review"] = self._source_review_meta()
                 projected.append(item)
         for record_id, row in overrides.items():
             if record_id not in self.relationship_by_id and row["operation"] == "create":
@@ -851,16 +1328,17 @@ class ReviewRepository:
             result[relation_id] = conflicts
         return result
 
+    @with_repository_lock
     def _review_snapshot(self) -> dict[str, Any]:
         """Build immutable projections once per review version and index by chunk."""
-        current_version = self.version()
+        current_token = self._version_token()
         snapshot = self._snapshot
-        if snapshot is not None and snapshot["version"] == current_version:
+        if snapshot is not None and snapshot["version_token"] == current_token:
             return snapshot
 
         with self._snapshot_lock:
             snapshot = self._snapshot
-            if snapshot is not None and snapshot["version"] == current_version:
+            if snapshot is not None and snapshot["version_token"] == current_token:
                 return snapshot
 
             entities = self.projected_entities()
@@ -883,7 +1361,7 @@ class ReviewRepository:
                 for row in self._overrides(kind).values()
             }
             snapshot = {
-                "version": current_version,
+                "version_token": current_token,
                 "entities": entities,
                 "canonicals": canonicals,
                 "relationships": relationships,
@@ -905,15 +1383,7 @@ class ReviewRepository:
         decision = str(record.get("review_decision") or "pending")
         source = self.entity_by_id.get(entity_id)
         if operation == "source" and decision == "pending":
-            projected = deepcopy(source or record)
-            projected["_review"] = {
-                "operation": "source",
-                "deleted": False,
-                "added": False,
-                "modified": False,
-                "approved": False,
-            }
-            return projected
+            return self._project_entity_for_review(source or record, None)
 
         corrected = deepcopy(record.get("corrected_values", {}))
         if operation == "create":
@@ -934,7 +1404,7 @@ class ReviewRepository:
             payload.update(corrected)
         else:
             payload = corrected
-        return self._apply_override(
+        return self._project_entity_for_review(
             source or {},
             {
                 "operation": operation,
@@ -952,7 +1422,6 @@ class ReviewRepository:
         *,
         chunk_id: str,
         changed_ids: set[str],
-        version: int,
     ) -> None:
         """Patch the hot projection after a chunk save instead of rebuilding it."""
         if previous_snapshot is None:
@@ -994,7 +1463,7 @@ class ReviewRepository:
         override_chunks = set(previous_snapshot["override_chunks"])
         override_chunks.add(chunk_id)
         self._snapshot = {
-            "version": version,
+            "version_token": self._version_token(),
             "entities": entities,
             "canonicals": canonicals,
             "relationships": relationships,
@@ -1013,6 +1482,7 @@ class ReviewRepository:
             rows.update(result.get("chunk_reviews", {}))
         return rows
 
+    @with_repository_lock
     def chunk_summaries(self, pending_only: bool = False) -> list[dict[str, Any]]:
         snapshot = self._review_snapshot()
         conflicts = snapshot["conflicts"]
@@ -1073,6 +1543,7 @@ class ReviewRepository:
             for row in self._overrides(kind).values()
         )
 
+    @with_repository_lock
     def task(self) -> dict[str, Any]:
         summaries = self.chunk_summaries()
         approved = sum(1 for item in summaries if item["approved"])
@@ -1122,27 +1593,100 @@ class ReviewRepository:
             )
         return path
 
+    @staticmethod
+    def _chunk_detail_dto(chunk: dict[str, Any]) -> dict[str, Any]:
+        keys = (
+            "chunk_id",
+            "section_title",
+            "section_path",
+            "page_start",
+            "page_end",
+            "text",
+            "_source_title",
+            "_doc_id",
+        )
+        return {
+            key: deepcopy(chunk[key])
+            for key in keys
+            if key in chunk
+        }
+
+    @staticmethod
+    def _entity_detail_dto(entity: dict[str, Any]) -> dict[str, Any]:
+        keys = (
+            "entity_id",
+            "chunk_id",
+            "name",
+            "entity_type",
+            "evidence_text",
+            "status",
+            "confidence",
+            "review_canonical_id",
+            "canonical_entity_id",
+            "evidence_span",
+            "evidence_spans",
+            "entity_status",
+            "source_title",
+            "document_core_disease",
+            "_review",
+        )
+        return {
+            key: deepcopy(entity[key])
+            for key in keys
+            if key in entity
+        }
+
+    @staticmethod
+    def _relationship_detail_dto(
+        relationship: dict[str, Any],
+    ) -> dict[str, Any]:
+        keys = (
+            "relation_id",
+            "chunk_id",
+            "source_chunk_id",
+            "target_chunk_id",
+            "start_entity_id",
+            "end_entity_id",
+            "relation_type",
+            "evidence_text",
+            "status",
+            "confidence",
+            "conflicts",
+            "source_title",
+            "_review",
+        )
+        return {
+            key: deepcopy(relationship[key])
+            for key in keys
+            if key in relationship
+        }
+
+    @with_repository_lock
     def chunk_detail(self, chunk_id: str) -> dict[str, Any]:
         chunk = self.chunk_by_id.get(chunk_id)
         if not chunk:
             raise HTTPException(status_code=404, detail="未找到该 chunk")
         snapshot = self._review_snapshot()
-        entities = deepcopy(snapshot["entities_by_chunk"].get(chunk_id, []))
+        entities = [
+            self._entity_detail_dto(entity)
+            for entity in snapshot["entities_by_chunk"].get(chunk_id, [])
+        ]
         for entity in entities:
             entity["canonical_entity_id"] = entity.get(
                 "review_canonical_id"
             ) or self.raw_to_canonical.get(str(entity.get("entity_id")))
-        relations = deepcopy(snapshot["relationships_by_chunk"].get(chunk_id, []))
-        conflicts = {
-            str(relation["relation_id"]): snapshot["conflicts"].get(
-                str(relation["relation_id"]), []
-            )
-            for relation in relations
-        }
+        relations = [
+            self._relationship_detail_dto(relation)
+            for relation in snapshot["relationships_by_chunk"].get(chunk_id, [])
+        ]
+        conflicts = {}
         for relation in relations:
-            relation["conflicts"] = deepcopy(
-                conflicts.get(str(relation["relation_id"]), [])
+            relation_id = str(relation["relation_id"])
+            relation_conflicts = deepcopy(
+                snapshot["conflicts"].get(relation_id, [])
             )
+            relation["conflicts"] = relation_conflicts
+            conflicts[relation_id] = relation_conflicts
         review = self._chunk_review_rows().get(chunk_id)
         option_ids = {
             str(relation.get("start_entity_id"))
@@ -1157,7 +1701,7 @@ class ReviewRepository:
             if entity.get("canonical_entity_id")
         }
         return {
-            "chunk": deepcopy(chunk),
+            "chunk": self._chunk_detail_dto(chunk),
             "entities": entities,
             "relationships": relations,
             "entity_options": [
@@ -1172,18 +1716,21 @@ class ReviewRepository:
                 "has_changes": bool(review["has_changes"]) if review else False,
                 "issue_count": sum(len(value) for value in conflicts.values()),
             },
-            "version": snapshot["version"],
+            "version": self.document_version(
+                self._document_id_for_chunk(chunk_id)
+            ),
         }
 
+    @with_repository_lock
     def save_chunk_entities(
         self,
         chunk_id: str,
         payload: dict[str, Any],
     ) -> dict[str, Any]:
         """Atomically persist the final entity draft for one chunk."""
-        self._assert_version(payload["base_version"])
         if chunk_id not in self.chunk_by_id:
             raise HTTPException(status_code=404, detail="未找到该 chunk")
+        self._assert_version(payload["base_version"], chunk_id=chunk_id)
 
         previous_snapshot = self._review_snapshot()
         current = {
@@ -1254,7 +1801,9 @@ class ReviewRepository:
             return {
                 "chunk_id": chunk_id,
                 "changed": 0,
-                "version": self.version(),
+                "version": self.document_version(
+                    self._document_id_for_chunk(chunk_id)
+                ),
             }
 
         document_id = self._document_id_for_chunk(chunk_id)
@@ -1274,7 +1823,7 @@ class ReviewRepository:
         previous_version = result.get("version", 0)
         previous_updated_at = result.get("updated_at")
         timestamp = utc_now()
-        version = self.version() + 1
+        version = int(result.get("version", 0)) + 1
         sequence = sum(
             len(item.get("audit_events", []))
             for item in self.results.values()
@@ -1426,7 +1975,6 @@ class ReviewRepository:
                 previous_snapshot,
                 chunk_id=chunk_id,
                 changed_ids=set(record_backups),
-                version=version,
             )
         except Exception:
             for entity_id, backup in record_backups.items():
@@ -1448,6 +1996,7 @@ class ReviewRepository:
             "version": version,
         }
 
+    @with_repository_lock
     def _write_override(
         self,
         *,
@@ -1461,11 +2010,11 @@ class ReviewRepository:
         base_version: int,
         action: str,
     ) -> int:
-        self._assert_version(base_version)
-        timestamp = utc_now()
-        version = self.version() + 1
         document_id = self._document_id_for_chunk(chunk_id)
         result = self.results[document_id]
+        self._assert_version(base_version, chunk_id=chunk_id)
+        timestamp = utc_now()
+        version = int(result.get("version", 0)) + 1
         collection = {
             "entity": "entities",
             "canonical": "canonical_entities",
@@ -1555,6 +2104,7 @@ class ReviewRepository:
         self._save_result(document_id)
         return version
 
+    @with_repository_lock
     def create_entity(self, payload: dict[str, Any]) -> dict[str, Any]:
         chunk_id = payload["chunk_id"]
         if chunk_id not in self.chunk_by_id:
@@ -1625,6 +2175,7 @@ class ReviewRepository:
         result["canonical_entities"].append(canonical)
         self._save_result(document_id)
 
+    @with_repository_lock
     def update_entity(self, entity_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         source = self.entity_by_id.get(entity_id)
         existing = next(
@@ -1651,10 +2202,15 @@ class ReviewRepository:
         canonical_id = self.raw_to_canonical.get(entity_id)
         if scope == "all" and canonical_id:
             canonical = self.canonical_by_id.get(canonical_id, {})
+            document_id = self._document_id_for_chunk(chunk_id)
             target_ids = [
                 str(value)
                 for value in canonical.get("raw_entity_ids", [])
                 if value in self.entity_by_id
+                and self._document_id_for_chunk(
+                    str(self.entity_by_id[value].get("chunk_id", ""))
+                )
+                == document_id
             ] or [entity_id]
         if scope == "current" and {"name", "entity_type"} & patch.keys():
             patch["review_canonical_id"] = existing.get(
@@ -1685,6 +2241,7 @@ class ReviewRepository:
             )
         return {"entity_id": entity_id, "updated_mentions": len(target_ids), "version": version}
 
+    @with_repository_lock
     def delete_entity(
         self, entity_id: str, *, chunk_id: str, base_version: int
     ) -> dict[str, Any]:
@@ -1717,6 +2274,7 @@ class ReviewRepository:
         )
         return {"entity_id": entity_id, "version": version}
 
+    @with_repository_lock
     def restore_entity(
         self, entity_id: str, *, chunk_id: str, base_version: int
     ) -> dict[str, Any]:
@@ -1728,6 +2286,7 @@ class ReviewRepository:
         )
         return {"entity_id": entity_id, "version": version}
 
+    @with_repository_lock
     def _restore_record(
         self,
         *,
@@ -1736,9 +2295,9 @@ class ReviewRepository:
         chunk_id: str,
         base_version: int,
     ) -> int:
-        self._assert_version(base_version)
         document_id = self._document_id_for_chunk(chunk_id)
         result = self.results[document_id]
+        self._assert_version(base_version, chunk_id=chunk_id)
         collection = "entities" if kind == "entity" else "relationships"
         id_key = "entity_id" if kind == "entity" else "relation_id"
         record = next(
@@ -1753,7 +2312,7 @@ class ReviewRepository:
             raise HTTPException(status_code=404, detail=f"该{label}没有可恢复的删除记录")
 
         timestamp = utc_now()
-        version = self.version() + 1
+        version = int(result.get("version", 0)) + 1
         metadata = record.pop("restore_metadata", {})
         previous_operation = metadata.get("operation")
         if previous_operation:
@@ -1798,6 +2357,7 @@ class ReviewRepository:
         self._save_result(document_id)
         return version
 
+    @with_repository_lock
     def create_relationship(self, payload: dict[str, Any]) -> dict[str, Any]:
         if payload["relation_type"] not in self.relation_definitions:
             raise HTTPException(status_code=422, detail="关系类型不在 V3.6 契约中")
@@ -1826,6 +2386,7 @@ class ReviewRepository:
         )
         return {"relation_id": relation_id, "version": version}
 
+    @with_repository_lock
     def update_relationship(
         self, relation_id: str, payload: dict[str, Any]
     ) -> dict[str, Any]:
@@ -1867,6 +2428,7 @@ class ReviewRepository:
         )
         return {"relation_id": relation_id, "version": version}
 
+    @with_repository_lock
     def delete_relationship(
         self, relation_id: str, *, chunk_id: str, base_version: int
     ) -> dict[str, Any]:
@@ -1899,6 +2461,7 @@ class ReviewRepository:
         )
         return {"relation_id": relation_id, "version": version}
 
+    @with_repository_lock
     def restore_relationship(
         self, relation_id: str, *, chunk_id: str, base_version: int
     ) -> dict[str, Any]:
@@ -1910,8 +2473,9 @@ class ReviewRepository:
         )
         return {"relation_id": relation_id, "version": version}
 
+    @with_repository_lock
     def approve_chunk(self, chunk_id: str, base_version: int) -> dict[str, Any]:
-        self._assert_version(base_version)
+        self._assert_version(base_version, chunk_id=chunk_id)
         detail = self.chunk_detail(chunk_id)
         blocking = [
             conflict
@@ -1929,9 +2493,9 @@ class ReviewRepository:
                 },
             )
         timestamp = utc_now()
-        version = self.version() + 1
         document_id = self._document_id_for_chunk(chunk_id)
         result = self.results[document_id]
+        version = int(result.get("version", 0)) + 1
         result["chunk_reviews"][chunk_id] = {
             "chunk_id": chunk_id,
             "status": "approved",
@@ -1969,6 +2533,7 @@ class ReviewRepository:
         ]
         return sorted(rows, key=lambda item: int(item.get("sequence", 0)))
 
+    @with_repository_lock
     def import_review(self, zip_path: Path) -> dict[str, Any]:
         """Import per-PDF review JSON files from a review export."""
         if not zip_path.exists():
@@ -2009,9 +2574,31 @@ class ReviewRepository:
                     status_code=422,
                     detail="导入包没有覆盖当前任务的全部 PDF。",
                 )
-            self.results = imported
+            self.results = {
+                document_id: self._rebase_document_result(
+                    document_id,
+                    payload,
+                )
+                for document_id, payload in imported.items()
+            }
             for document_id in imported:
-                self._save_result(document_id)
+                document_dir = (
+                    self.delta_root / self._safe_result_name(document_id)
+                )
+                if document_dir.exists():
+                    for path in document_dir.glob("*.review.json"):
+                        path.unlink()
+                self._persist_all_document_deltas(document_id)
+                self._atomic_write_json(
+                    self._migration_marker_path(document_id),
+                    {
+                        "format": "legacy-review-migration-v1",
+                        "document_id": document_id,
+                        "legacy_file": self._result_path(document_id).name,
+                        "migrated_at": utc_now(),
+                    },
+                )
+            self._snapshot = None
 
         return {
             "version": manifest.get("review_version", 0),
@@ -2020,6 +2607,7 @@ class ReviewRepository:
             "counts": manifest.get("counts", {}),
         }
 
+    @with_repository_lock
     def build_export(self, *, final: bool) -> Path:
         task = self.task()
         if final:
@@ -2034,9 +2622,9 @@ class ReviewRepository:
                 )
         suffix = "final" if final else "draft"
         export_path = self.export_root / f"reviewed_{suffix}.zip"
-        entities = self.projected_entities()
+        entities = self.projected_export_entities()
         canonicals = self.projected_canonical_entities()
-        relationships = self.projected_relationships()
+        relationships = self.projected_export_relationships()
         manifest = {
             "source_manifest": self.manifest,
             "schema_version": self.schema.get("schema_version"),
@@ -2062,7 +2650,14 @@ class ReviewRepository:
         with zipfile.ZipFile(export_path, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
             for document_id in self.chunk_sources:
                 path = self._result_path(document_id)
-                bundle.writestr(f"results/{path.name}", path.read_bytes())
+                bundle.writestr(
+                    f"results/{path.name}",
+                    json.dumps(
+                        self.results[document_id],
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    ).encode("utf-8"),
+                )
             bundle.writestr("reviewed_entities.jsonl", jsonl_bytes(entities))
             bundle.writestr(
                 "reviewed_canonical_entities.jsonl", jsonl_bytes(canonicals)
