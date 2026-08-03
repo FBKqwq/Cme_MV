@@ -965,6 +965,22 @@ async function downloadDraft() {
   window.location.assign(reviewPath("/api/review/export"));
 }
 
+async function exportWord() {
+  // 预留 FastGPT API 接口：后续接入自动格式生成后，后端将返回 Word 下载地址
+  beginSaving();
+  try {
+    const result = await api<{ url: string; filename: string }>(
+      reviewPath("/api/review/export-word"),
+      mutation("POST", { batch_id: activeBatch.value }),
+    );
+    showToast("Word 文档已生成，开始下载");
+    if (result.url) window.location.assign(result.url);
+    finishSaving();
+  } catch (error) {
+    failSaving(error);
+  }
+}
+
 async function leaveReview() {
   if (!(await flushEntityDraft())) return;
   await router.push("/");
@@ -1066,6 +1082,7 @@ onBeforeUnmount(() => {
       @batch="selectBatch"
       @import="importReview"
       @export="downloadDraft"
+      @export-word="exportWord"
       @finalize="finalizeReview"
     />
 
