@@ -5,6 +5,7 @@ import {
   ChevronDown,
   Circle,
   Download,
+  FileDown,
   FileCheck2,
   LoaderCircle,
   MoreHorizontal,
@@ -28,6 +29,7 @@ const emit = defineEmits<{
   batch: [batchId: string];
   import: [event: Event];
   export: [];
+  exportWord: [];
   finalize: [];
 }>();
 
@@ -78,6 +80,14 @@ function selectBatch(event: Event) {
     </div>
 
     <div class="topbar-actions">
+      <button
+        class="button word-export-button"
+        type="button"
+        @click="emit('exportWord')"
+      >
+        <FileDown :size="15" />
+        导出Word文档
+      </button>
       <label class="batch-picker">
         <span>复验批次</span>
         <select
@@ -304,6 +314,22 @@ function selectBatch(event: Event) {
 .topbar-actions {
   justify-content: flex-end;
   gap: 8px;
+}
+
+.word-export-button {
+  min-height: 34px;
+  padding: 0 11px;
+  color: var(--primary);
+  border-color: #dce0f7;
+  background: #f7f7ff;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.word-export-button:hover:not(:disabled) {
+  color: var(--primary-strong);
+  border-color: #c9d0f3;
+  background: var(--primary-soft);
 }
 
 .batch-picker {

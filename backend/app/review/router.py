@@ -74,24 +74,10 @@ def load_repository(
     global repository, repository_batch, startup_error, review_data_root
     review_data_root = (data_root or REVIEW_DATA_ROOT).resolve()
     try:
-<<<<<<< HEAD
-        repository = ReviewRepository(
-            project_root=root.parents[1],
-            inbox_root=root / "current",
-            result_root=root / "state" / "results",
-            export_root=root / "state" / "exports",
-            schema_path=(
-                root 
-                / "current"
-                / "graph_property_schema_v3_6.json"
-            ),
-        )
-=======
         if batch_id not in _batch_ids():
             raise ValueError(f"未找到复验批次目录：{review_data_root / batch_id}")
         repository = _build_repository(batch_id)
         repository_batch = batch_id
->>>>>>> upstream/main
         startup_error = None
     except Exception as exc:  # surfaced as an actionable API state
         repository = None
