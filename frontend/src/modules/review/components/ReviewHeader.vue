@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {
+  AlertCircle,
   ArrowLeftToLine,
   CheckCircle2,
   ChevronDown,
@@ -10,9 +11,13 @@ import {
   MoreHorizontal,
   ShieldCheck,
   Upload,
-  AlertCircle,
 } from "lucide-vue-next";
-import type { ReviewBatch, SaveState, TaskInfo } from "../types";
+
+import type {
+  ReviewBatch,
+  SaveState,
+  TaskInfo,
+} from "../types";
 
 defineProps<{
   task: TaskInfo | null;
@@ -21,6 +26,9 @@ defineProps<{
   batchSwitching: boolean;
   saveState: SaveState;
   savingLabel: string;
+
+  /** 是否正在生成未复验实体 PDF */
+  exportingPendingPdf: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -28,51 +36,102 @@ const emit = defineEmits<{
   batch: [batchId: string];
   import: [event: Event];
   export: [];
+
+  /** 导出未复验实体 PDF */
+  "export-pending-pdf": [];
+
   finalize: [];
 }>();
 
 function selectBatch(event: Event) {
-  emit("batch", (event.target as HTMLSelectElement).value);
+  emit(
+      "batch",
+      (event.target as HTMLSelectElement).value,
+  );
 }
 </script>
 
 <template>
   <header class="topbar">
     <div class="brand-block">
-      <div class="brand-mark" aria-hidden="true">
-        <ShieldCheck :size="21" :stroke-width="1.9" />
+      <div
+          class="brand-mark"
+          aria-hidden="true"
+      >
+        <ShieldCheck
+            :size="21"
+            :stroke-width="1.9"
+        />
       </div>
+
       <div class="brand-copy">
-        <div class="brand-name">医师复验工作台</div>
+        <div class="brand-name">
+          医师复验工作台
+        </div>
+
         <div class="brand-context">
-          <span class="live-dot" aria-hidden="true"></span>
+          <span
+              class="live-dot"
+              aria-hidden="true"
+          ></span>
           证据抽取复核
         </div>
       </div>
     </div>
 
-    <div v-if="task" class="document-heading">
+    <div
+        v-if="task"
+        class="document-heading"
+    >
       <div class="document-heading-main">
-        <span class="document-title">{{ task.document.title }}</span>
-        <span class="contract-badge">Graph Contract V{{ task.document.schema_version }}</span>
+        <span class="document-title">
+          {{ task.document.title }}
+        </span>
+
+        <span class="contract-badge">
+          Graph Contract V{{ task.document.schema_version }}
+        </span>
       </div>
-      <div class="header-progress" aria-label="全篇复验进度">
+
+      <div
+          class="header-progress"
+          aria-label="全篇复验进度"
+      >
         <span class="header-progress-label">
           复验进度
-          <strong>{{ task.progress.approved }}/{{ task.progress.total }}</strong>
+
+          <strong>
+            {{ task.progress.approved }}/{{ task.progress.total }}
+          </strong>
         </span>
+
         <span class="header-progress-track">
           <span
-            class="header-progress-value"
-            :style="{ width: `${task.progress.percent}%` }"
+              class="header-progress-value"
+              :style="{
+              width: `${task.progress.percent}%`,
+            }"
           ></span>
         </span>
-        <span class="header-progress-percent">{{ task.progress.percent }}%</span>
-        <span v-if="task.progress.issues" class="header-progress-issues">
-          <AlertCircle :size="12" />{{ task.progress.issues }} 项需处理
+
+        <span class="header-progress-percent">
+          {{ task.progress.percent }}%
         </span>
-        <span v-else class="header-progress-clear">
-          <CheckCircle2 :size="12" />暂无阻塞
+
+        <span
+            v-if="task.progress.issues"
+            class="header-progress-issues"
+        >
+          <AlertCircle :size="12" />
+          {{ task.progress.issues }} 项需处理
+        </span>
+
+        <span
+            v-else
+            class="header-progress-clear"
+        >
+          <CheckCircle2 :size="12" />
+          暂无阻塞
         </span>
       </div>
     </div>
@@ -80,55 +139,155 @@ function selectBatch(event: Event) {
     <div class="topbar-actions">
       <label class="batch-picker">
         <span>复验批次</span>
+
         <select
-          aria-label="切换复验批次"
-          :value="activeBatch"
-          :disabled="batchSwitching || saveState === 'saving'"
-          @change="selectBatch"
+            aria-label="切换复验批次"
+            :value="activeBatch"
+            :disabled="
+            batchSwitching ||
+            saveState === 'saving' ||
+            exportingPendingPdf
+          "
+            @change="selectBatch"
         >
           <option
-            v-for="batch in batches"
-            :key="batch.id"
-            :value="batch.id"
-            :disabled="batch.status !== 'ready'"
+              v-for="batch in batches"
+              :key="batch.id"
+              :value="batch.id"
+              :disabled="batch.status !== 'ready'"
           >
             {{ batch.label }}
           </option>
         </select>
       </label>
 
-      <div class="save-indicator" :class="saveState" role="status">
-        <LoaderCircle v-if="saveState === 'saving'" :size="14" class="spin" />
-        <CheckCircle2 v-else-if="saveState === 'saved'" :size="14" />
-        <AlertCircle v-else-if="saveState === 'error'" :size="14" />
-        <Circle v-else :size="10" />
+      <div
+          class="save-indicator"
+          :class="saveState"
+          role="status"
+      >
+        <LoaderCircle
+            v-if="saveState === 'saving'"
+            :size="14"
+            class="spin"
+        />
+
+        <CheckCircle2
+            v-else-if="saveState === 'saved'"
+            :size="14"
+        />
+
+        <AlertCircle
+            v-else-if="saveState === 'error'"
+            :size="14"
+        />
+
+        <Circle
+            v-else
+            :size="10"
+        />
+
         <span>{{ savingLabel }}</span>
       </div>
 
       <details class="utility-menu">
-        <summary class="button quiet" aria-label="更多复验操作">
+        <summary
+            class="button quiet"
+            aria-label="更多复验操作"
+        >
           <MoreHorizontal :size="17" />
           <span>更多</span>
           <ChevronDown :size="14" />
         </summary>
+
         <div class="utility-menu-popover">
-          <button type="button" @click="emit('back')">
+          <button
+              type="button"
+              :disabled="exportingPendingPdf"
+              @click="emit('back')"
+          >
             <ArrowLeftToLine :size="16" />
-            <span><strong>返回诊断系统</strong><small>离开复验工作台</small></span>
+
+            <span>
+              <strong>返回诊断系统</strong>
+              <small>离开复验工作台</small>
+            </span>
           </button>
-          <label>
+
+          <label
+              :class="{
+              disabled: exportingPendingPdf,
+            }"
+          >
             <Upload :size="16" />
-            <span><strong>导入复验</strong><small>载入 ZIP 复验包</small></span>
-            <input type="file" accept=".zip" @change="emit('import', $event)" />
+
+            <span>
+              <strong>导入复验</strong>
+              <small>载入 ZIP 复验包</small>
+            </span>
+
+            <input
+                type="file"
+                accept=".zip"
+                :disabled="exportingPendingPdf"
+                @change="emit('import', $event)"
+            />
           </label>
-          <button type="button" @click="emit('export')">
+
+          <button
+              type="button"
+              :disabled="exportingPendingPdf"
+              @click="emit('export')"
+          >
             <Download :size="16" />
-            <span><strong>导出草稿</strong><small>保存当前复验进度</small></span>
+
+            <span>
+              <strong>导出草稿</strong>
+              <small>保存当前复验进度</small>
+            </span>
           </button>
         </div>
       </details>
 
-      <button class="button primary finalize-button" type="button" @click="emit('finalize')">
+      <!-- 新增：导出未复验实体 PDF -->
+      <button
+          class="button quiet pending-export-button"
+          type="button"
+          :disabled="exportingPendingPdf"
+          :aria-busy="exportingPendingPdf"
+          :aria-label="
+          exportingPendingPdf
+            ? '正在生成未复验实体 PDF'
+            : '导出未复验实体 PDF'
+        "
+          @click="emit('export-pending-pdf')"
+      >
+        <LoaderCircle
+            v-if="exportingPendingPdf"
+            :size="16"
+            class="spin"
+        />
+
+        <Download
+            v-else
+            :size="16"
+        />
+
+        <span class="pending-export-text">
+          {{
+            exportingPendingPdf
+                ? "正在生成 PDF..."
+                : "导出未复验实体"
+          }}
+        </span>
+      </button>
+
+      <button
+          class="button primary finalize-button"
+          type="button"
+          :disabled="exportingPendingPdf"
+          @click="emit('finalize')"
+      >
         <FileCheck2 :size="16" />
         完成本篇复验
       </button>
@@ -141,7 +300,10 @@ function selectBatch(event: Event) {
   position: relative;
   z-index: 30;
   display: grid;
-  grid-template-columns: minmax(220px, 0.75fr) minmax(280px, 1.35fr) minmax(340px, 0.9fr);
+  grid-template-columns:
+    minmax(220px, 0.75fr)
+    minmax(280px, 1.35fr)
+    minmax(480px, 1fr);
   align-items: center;
   height: var(--topbar-height);
   padding: 0 18px;
@@ -302,6 +464,7 @@ function selectBatch(event: Event) {
 }
 
 .topbar-actions {
+  min-width: 0;
   justify-content: flex-end;
   gap: 8px;
 }
@@ -405,10 +568,16 @@ function selectBatch(event: Event) {
   background: transparent;
 }
 
-.utility-menu-popover button:hover,
-.utility-menu-popover label:hover {
+.utility-menu-popover button:hover:not(:disabled),
+.utility-menu-popover label:hover:not(.disabled) {
   color: var(--primary);
   background: var(--surface-hover);
+}
+
+.utility-menu-popover button:disabled,
+.utility-menu-popover label.disabled {
+  cursor: wait;
+  opacity: 0.55;
 }
 
 .utility-menu-popover span {
@@ -435,9 +604,55 @@ function selectBatch(event: Event) {
   opacity: 0;
 }
 
+/* 新增导出按钮 */
+.pending-export-button {
+  min-width: 142px;
+  white-space: nowrap;
+}
+
+.pending-export-button:disabled {
+  cursor: wait;
+  opacity: 0.66;
+}
+
+.pending-export-button .spin {
+  flex: 0 0 auto;
+}
+
+.finalize-button:disabled {
+  cursor: wait;
+  opacity: 0.66;
+}
+
+/*
+ * 屏幕稍窄时仅显示导出图标，
+ * 避免顶部操作区域被挤压。
+ */
+@media (max-width: 1500px) {
+  .topbar {
+    grid-template-columns:
+      minmax(200px, 0.7fr)
+      minmax(250px, 1fr)
+      minmax(390px, 0.9fr);
+  }
+
+  .pending-export-button {
+    width: 38px;
+    min-width: 38px;
+    padding: 0;
+  }
+
+  .pending-export-text {
+    display: none;
+  }
+}
+
 @media (max-width: 1279px) {
   .topbar {
-    grid-template-columns: minmax(200px, 0.7fr) minmax(240px, 1fr) minmax(300px, 0.8fr);
+    grid-template-columns:
+      minmax(200px, 0.7fr)
+      minmax(240px, 1fr)
+      minmax(320px, 0.8fr);
     padding: 0 13px;
   }
 
