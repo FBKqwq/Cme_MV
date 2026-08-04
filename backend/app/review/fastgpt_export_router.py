@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -10,8 +11,21 @@ from dotenv import load_dotenv
 from fastapi import APIRouter, HTTPException
 
 
-# 加载 backend/.env
-load_dotenv()
+# 当前文件位置：
+# backend/app/review/fastgpt_export_router.py
+#
+# parents[0] = review
+# parents[1] = app
+# parents[2] = backend
+BACKEND_ROOT = Path(__file__).resolve().parents[2]
+ENV_PATH = BACKEND_ROOT / ".env"
+
+# 明确读取 backend/.env，避免因启动目录不同而找不到环境变量
+load_dotenv(
+    dotenv_path=ENV_PATH,
+    override=False,
+)
+
 
 router = APIRouter(
     prefix="/api/review",
@@ -22,22 +36,37 @@ router = APIRouter(
 def get_required_env(name: str) -> str:
     """
     读取必需的环境变量。
-    如果缺少配置，返回清晰错误，而不是让程序莫名失败。
+
+    环境变量应配置在：
+    backend/.env
     """
     value = os.getenv(name, "").strip()
 
-    if not value:
-        raise RuntimeError(f"缺少环境变量：{name}")
+    if value:
+        return value
 
-    return value
+    if not ENV_PATH.exists():
+        raise RuntimeError(
+            f"缺少环境变量：{name}；"
+            f"同时未找到配置文件：{ENV_PATH}"
+        )
+
+    raise RuntimeError(
+        f"缺少环境变量：{name}；"
+        f"请检查配置文件：{ENV_PATH}"
+    )
 
 
-def parse_fastgpt_content(content: Any) -> dict[str, Any]:
+def parse_fastgpt_content(
+    content: Any,
+) -> dict[str, Any]:
     """
     解析 FastGPT 最终回复。
 
-    优先按 JSON 解析；
-    如果回复节点仍是普通文本，则尝试从文本中提取下载地址。
+    支持三种格式：
+    1. FastGPT 直接返回对象；
+    2. FastGPT 返回 JSON 字符串；
+    3. FastGPT 返回包含文件名和下载地址的普通文本。
     """
     if isinstance(content, dict):
         return content
@@ -47,7 +76,7 @@ def parse_fastgpt_content(content: Any) -> dict[str, Any]:
     if not text:
         raise ValueError("FastGPT 返回内容为空")
 
-    # 最理想情况：指定回复节点返回 JSON 字符串
+    # 尝试直接按 JSON 字符串解析
     try:
         parsed = json.loads(text)
 
@@ -56,7 +85,7 @@ def parse_fastgpt_content(content: Any) -> dict[str, Any]:
     except json.JSONDecodeError:
         pass
 
-    # 兼容 Markdown 代码块
+    # 兼容 Markdown JSON 代码块
     cleaned = re.sub(
         r"^```(?:json)?\s*|\s*```$",
         "",
@@ -72,17 +101,24 @@ def parse_fastgpt_content(content: Any) -> dict[str, Any]:
     except json.JSONDecodeError:
         pass
 
-    # 兼容原来的普通文本回复
-    url_match = re.search(r"https?://[^\s<>\"]+", text)
+    # 兼容普通文本回复，从文本中寻找下载地址
+    url_match = re.search(
+        r"https?://[^\s<>\"]+",
+        text,
+    )
 
     if not url_match:
         raise ValueError(
-            "无法从 FastGPT 回复中找到 PDF 下载地址，"
-            "请检查指定回复节点是否输出 download_url"
+            "无法从 FastGPT 回复中找到 PDF 下载地址。"
+            "请检查 FastGPT 的指定回复节点是否输出 "
+            "download_url。"
         )
 
-    download_url = url_match.group(0).rstrip("。.,，；;")
+    download_url = url_match.group(0).rstrip(
+        "。.,，；;)]}"
+    )
 
+    # 尝试从普通文本中提取 PDF 文件名
     file_match = re.search(
         r"([^\r\n<>:\"/\\|?*]+\.pdf)",
         text,
@@ -104,17 +140,26 @@ def parse_fastgpt_content(content: Any) -> dict[str, Any]:
 
 def call_fastgpt_export_workflow() -> dict[str, Any]:
     """
-    调用 FastGPT 工作流，让工作流生成医师复验 PDF。
+    调用 FastGPT 工作流，生成医师复验 PDF。
     """
-    api_base = get_required_env("FASTGPT_API_BASE").rstrip("/")
-    api_key = get_required_env("FASTGPT_API_KEY")
-    app_id = get_required_env("FASTGPT_APP_ID")
+    api_base = get_required_env(
+        "FASTGPT_API_BASE"
+    ).rstrip("/")
+
+    api_key = get_required_env(
+        "FASTGPT_API_KEY"
+    )
+
+    app_id = get_required_env(
+        "FASTGPT_APP_ID"
+    )
 
     url = f"{api_base}/v1/chat/completions"
 
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
+        "Accept": "application/json",
     }
 
     body = {
@@ -129,7 +174,15 @@ def call_fastgpt_export_workflow() -> dict[str, Any]:
     }
 
     try:
-        with httpx.Client(timeout=180.0) as client:
+        with httpx.Client(
+            timeout=httpx.Timeout(
+                connect=30.0,
+                read=180.0,
+                write=30.0,
+                pool=30.0,
+            ),
+            follow_redirects=True,
+        ) as client:
             response = client.post(
                 url,
                 headers=headers,
@@ -140,16 +193,18 @@ def call_fastgpt_export_workflow() -> dict[str, Any]:
 
     except httpx.TimeoutException as exc:
         raise RuntimeError(
-            "调用 FastGPT 超时，请检查 FastAPI、cpolar 和 "
-            "FastGPT 工作流是否都在运行"
+            "调用 FastGPT 超时。请检查："
+            "FastGPT 工作流、cpolar 和 PDF 生成后端"
+            "是否都在运行。"
         ) from exc
 
     except httpx.HTTPStatusError as exc:
         error_text = exc.response.text[:1000]
 
         raise RuntimeError(
-            f"FastGPT 返回错误状态 "
-            f"{exc.response.status_code}：{error_text}"
+            "FastGPT 返回错误状态 "
+            f"{exc.response.status_code}："
+            f"{error_text}"
         ) from exc
 
     except httpx.RequestError as exc:
@@ -161,17 +216,31 @@ def call_fastgpt_export_workflow() -> dict[str, Any]:
         result = response.json()
     except ValueError as exc:
         raise RuntimeError(
-            "FastGPT 返回的不是有效 JSON"
+            "FastGPT 返回的内容不是有效 JSON"
         ) from exc
 
     try:
-        content = result["choices"][0]["message"]["content"]
-    except (KeyError, IndexError, TypeError) as exc:
+        content = (
+            result["choices"][0]
+            ["message"]
+            ["content"]
+        )
+    except (
+        KeyError,
+        IndexError,
+        TypeError,
+    ) as exc:
         raise RuntimeError(
-            f"FastGPT 返回格式不符合预期：{result}"
+            "FastGPT 返回格式不符合预期："
+            f"{result}"
         ) from exc
 
-    parsed = parse_fastgpt_content(content)
+    try:
+        parsed = parse_fastgpt_content(
+            content
+        )
+    except ValueError as exc:
+        raise RuntimeError(str(exc)) from exc
 
     download_url = str(
         parsed.get("download_url") or ""
@@ -179,16 +248,24 @@ def call_fastgpt_export_workflow() -> dict[str, Any]:
 
     if not download_url:
         raise RuntimeError(
-            "FastGPT 工作流没有返回 download_url"
+            "FastGPT 工作流没有返回 "
+            "download_url"
         )
 
+    file_name = str(
+        parsed.get("file_name")
+        or "医师复验清单.pdf"
+    ).strip()
+
     return {
-        "success": bool(parsed.get("success", True)),
-        "message": "医师复验 PDF 生成成功",
-        "file_name": str(
-            parsed.get("file_name")
-            or "医师复验清单.pdf"
+        "success": bool(
+            parsed.get("success", True)
         ),
+        "message": str(
+            parsed.get("message")
+            or "医师复验 PDF 生成成功"
+        ),
+        "file_name": file_name,
         "download_url": download_url,
     }
 
@@ -199,9 +276,9 @@ def call_fastgpt_export_workflow() -> dict[str, Any]:
 )
 def export_pdf_via_fastgpt() -> dict[str, Any]:
     """
-    提供给 Cme_MV 前端调用的接口。
+    提供给 Cme_MV 前端调用。
 
-    前端不需要知道 FastGPT Key，也不需要直接访问 FastGPT。
+    前端只调用本接口，不接触 FastGPT API Key。
     """
     try:
         return call_fastgpt_export_workflow()
@@ -215,5 +292,8 @@ def export_pdf_via_fastgpt() -> dict[str, Any]:
     except Exception as exc:
         raise HTTPException(
             status_code=500,
-            detail=f"生成医师复验 PDF 失败：{exc}",
+            detail=(
+                "生成医师复验 PDF 失败："
+                f"{exc}"
+            ),
         ) from exc
