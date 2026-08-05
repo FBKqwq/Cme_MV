@@ -974,7 +974,6 @@ async function downloadDraft() {
 async function exportPendingReviewPdf() {
   if (exportingPendingPdf.value) return;
 
-  // 先保存当前页面尚未提交的修改
   if (!(await flushEntityDraft())) {
     showToast("当前修改尚未保存，暂时无法导出");
     return;
@@ -983,9 +982,11 @@ async function exportPendingReviewPdf() {
   exportingPendingPdf.value = true;
 
   try {
-    showToast("正在生成未复验实体 PDF，请稍候");
+    showToast(`正在生成第 ${activeBatch.value} 批未复验实体 PDF，请稍候`);
 
-    const result = await api<ReviewPdfExportResult>(
+    // reviewApi 会自动追加：
+    // ?batch=当前批次
+    const result = await reviewApi<ReviewPdfExportResult>(
         "/api/review/export-pdf-via-fastgpt",
         {
           method: "POST",
@@ -1004,9 +1005,11 @@ async function exportPendingReviewPdf() {
       throw new Error("后端没有返回 PDF 下载地址");
     }
 
-    showToast(result.message || "医师复验 PDF 已生成");
+    showToast(
+        result.message ||
+        `第 ${activeBatch.value} 批医师复验 PDF 已生成`,
+    );
 
-    // 创建临时链接并触发下载
     window.location.assign(result.download_url);
   } catch (error) {
     showToast(`导出失败：${errorText(error)}`);

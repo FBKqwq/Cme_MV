@@ -52,8 +52,8 @@ OUTPUT_PATH = (
     / f"医师复验清单_机器待复验且人工未操作_{GENERATED_DATE}.docx"
 )
 
-# 继续排除 Blau 文档；不需要排除时可以改为 None。
-EXCLUDED_DOCUMENT_ID: str | None = "DOC_91bfb25e36f4"
+# 不再排除任何文档。当前批次中的全部文献都参与未操作实体筛选。
+EXCLUDED_DOCUMENT_ID: str | None = None
 
 # 正式 API 中待复验数量会变化，因此不再固定为 32。
 # 如需临时校验固定数量，可将 None 改成具体数字。
@@ -137,18 +137,61 @@ def load_chunks() -> tuple[
     return documents, chunks, document_order
 
 
-def load_touched_entity_ids() -> set[str]:
-    touched: set[str] = set()
+def load_reviewed_entity_ids() -> set[str]:
+    """读取当前已经形成明确人工结论的实体 ID。
+
+    这里判断的是实体的“当前复验结论”，而不是它是否曾经被操作过。
+
+    因此：
+    - review_decision=accepted/rejected 等终态：视为已人工复验；
+    - review_decision=pending：视为当前未复验；
+    - 即使 review_version > 0，或曾经修改/通过/拒绝，只要后来撤销为
+      pending，就应重新进入未复验 PDF。
+
+    同一实体若出现多条记录，优先采用 review_version 较大的最新记录。
+    """
+    latest_states: dict[str, tuple[tuple[int, str, str], str]] = {}
     delta_root = REVIEW_ROOT / "state" / "reviews"
-    for path in delta_root.glob("*/*.review.json"):
+
+    for path in sorted(delta_root.glob("*/*.review.json")):
         payload = read_json(path)
         for entity in payload.get("entities", []):
-            version = int(entity.get("review_version", 0))
-            operation = str(entity.get("review_operation") or "source")
-            decision = str(entity.get("review_decision") or "pending")
-            if version > 0 or operation != "source" or decision != "pending":
-                touched.add(str(entity.get("entity_id")))
-    return touched
+            entity_id = str(entity.get("entity_id") or "").strip()
+            if not entity_id:
+                continue
+
+            try:
+                version = int(entity.get("review_version", 0) or 0)
+            except (TypeError, ValueError):
+                version = 0
+
+            decision = str(
+                entity.get("review_decision") or "pending"
+            ).strip().lower()
+            updated_at = str(
+                entity.get("updated_at")
+                or entity.get("review_updated_at")
+                or ""
+            )
+
+            rank = (version, updated_at, str(path))
+            current = latest_states.get(entity_id)
+            if current is None or rank >= current[0]:
+                latest_states[entity_id] = (rank, decision)
+
+    pending_decisions = {
+        "",
+        "pending",
+        "review",
+        "unreviewed",
+        "not_reviewed",
+    }
+
+    return {
+        entity_id
+        for entity_id, (_, decision) in latest_states.items()
+        if decision not in pending_decisions
+    }
 
 
 def load_source_entities() -> list[dict[str, Any]]:
@@ -228,7 +271,7 @@ def build_review_rows() -> tuple[
     dict[str, dict[str, Any]],
 ]:
     documents, chunks, document_order = load_chunks()
-    touched = load_touched_entity_ids()
+    reviewed = load_reviewed_entity_ids()
     source_entities = load_source_entities()
 
     stats = {
@@ -240,19 +283,18 @@ def build_review_rows() -> tuple[
             "untouched": 0,
         }
         for doc_id in document_order
-        if doc_id != EXCLUDED_DOCUMENT_ID
     }
     untouched_rows: list[dict[str, Any]] = []
 
     for entity in source_entities:
         doc_id = entity_doc_id(entity)
-        if doc_id == EXCLUDED_DOCUMENT_ID or doc_id not in stats:
+        if doc_id not in stats:
             continue
         if str(entity.get("status")) != "review":
             continue
         stats[doc_id]["machine_review"] += 1
         entity_id = str(entity.get("entity_id") or "")
-        if entity_id in touched:
+        if entity_id in reviewed:
             stats[doc_id]["human_operated"] += 1
             continue
         stats[doc_id]["untouched"] += 1
@@ -338,7 +380,6 @@ def build_review_rows() -> tuple[
     summary_rows = [
         stats[doc_id]
         for doc_id in document_order
-        if doc_id != EXCLUDED_DOCUMENT_ID
     ]
     if (
         EXPECTED_UNTOUCHED is not None
@@ -411,16 +452,16 @@ def add_title_block(
     )
     add_text_paragraph(
         doc,
-        "机器判定需复验且人工未操作的实体（已排除Blau文档）",
+        "机器判定需复验且当前尚未形成人工结论的实体",
         size=13.2,
         color=MUTED,
         after=15,
     )
     metadata = [
-        ("筛选口径", "机器实体状态 status=review，且不存在任何人工实体复验增量或审计操作"),
+        ("筛选口径", "机器实体状态 status=review，且当前 review_decision=pending；撤销人工通过或拒绝后重新计入"),
         (
             "数据范围",
-            f"排除《Blau综合征诊疗专家共识（2024版）》后的{document_count}篇文献",
+            f"当前复验批次中的全部{document_count}篇文献",
         ),
         ("待复验数量", f"{untouched_count}条"),
         ("生成日期", GENERATED_DATE),
@@ -440,7 +481,7 @@ def add_summary_table(doc: Document, summary_rows: list[dict[str, Any]]) -> None
     widths = [650, 4110, 1500, 1500, 1600]
     set_table_geometry(table, widths)
     set_table_borders(table)
-    headers = ["序号", "文献", "机器需复验", "已人工操作", "本次未操作"]
+    headers = ["序号", "文献", "机器需复验", "已人工复验", "当前未复验"]
     for index, header in enumerate(headers):
         cell = table.rows[0].cells[index]
         set_cell_shading(cell, LIGHT_BLUE)
@@ -701,8 +742,8 @@ def add_entity_card(
             doc,
             (
                 f'机器判定需复验 {document_stats["machine_review"]} 条，'
-                f'已人工操作 {document_stats["human_operated"]} 条，'
-                f'本次导出未操作 {document_stats["untouched"]} 条。'
+                f'已人工复验 {document_stats["human_operated"]} 条，'
+                f'当前未复验 {document_stats["untouched"]} 条。'
             ),
             size=9.3,
             color=MUTED,
@@ -783,7 +824,7 @@ def build_document() -> Path:
 
     props = doc.core_properties
     props.title = "医师复验清单：机器待复验且人工未操作实体"
-    props.subject = "排除Blau文档后的未操作复验实体"
+    props.subject = "当前批次机器待复验且当前人工结论为 pending 的实体"
     props.author = "CmePlatform"
     props.keywords = "知识复验, 医师判定, 未操作实体"
 
