@@ -8,22 +8,19 @@ from typing import Any
 
 import httpx
 from dotenv import load_dotenv
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 
-# 当前文件位置：
+# 当前文件：
 # backend/app/review/fastgpt_export_router.py
 #
-# parents[0] = review
-# parents[1] = app
-# parents[2] = backend
+# parents[2] 指向 backend
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 ENV_PATH = BACKEND_ROOT / ".env"
 
-# 明确读取 backend/.env，避免因启动目录不同而找不到环境变量
 load_dotenv(
     dotenv_path=ENV_PATH,
-    override=False,
+    override=True,
 )
 
 
@@ -34,12 +31,6 @@ router = APIRouter(
 
 
 def get_required_env(name: str) -> str:
-    """
-    读取必需的环境变量。
-
-    环境变量应配置在：
-    backend/.env
-    """
     value = os.getenv(name, "").strip()
 
     if value:
@@ -57,17 +48,30 @@ def get_required_env(name: str) -> str:
     )
 
 
+def normalize_batch_id(batch: str) -> str:
+    """
+    校验批次编号。
+
+    当前批次通常是：
+    1、2、3、4……
+    同时允许字母、下划线和短横线，方便以后扩展。
+    """
+    batch_id = str(batch or "").strip()
+
+    if not batch_id:
+        raise RuntimeError("没有收到复验批次编号")
+
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", batch_id):
+        raise RuntimeError(
+            f"非法的复验批次编号：{batch_id}"
+        )
+
+    return batch_id
+
+
 def parse_fastgpt_content(
     content: Any,
 ) -> dict[str, Any]:
-    """
-    解析 FastGPT 最终回复。
-
-    支持三种格式：
-    1. FastGPT 直接返回对象；
-    2. FastGPT 返回 JSON 字符串；
-    3. FastGPT 返回包含文件名和下载地址的普通文本。
-    """
     if isinstance(content, dict):
         return content
 
@@ -76,7 +80,6 @@ def parse_fastgpt_content(
     if not text:
         raise ValueError("FastGPT 返回内容为空")
 
-    # 尝试直接按 JSON 字符串解析
     try:
         parsed = json.loads(text)
 
@@ -85,7 +88,6 @@ def parse_fastgpt_content(
     except json.JSONDecodeError:
         pass
 
-    # 兼容 Markdown JSON 代码块
     cleaned = re.sub(
         r"^```(?:json)?\s*|\s*```$",
         "",
@@ -101,7 +103,6 @@ def parse_fastgpt_content(
     except json.JSONDecodeError:
         pass
 
-    # 兼容普通文本回复，从文本中寻找下载地址
     url_match = re.search(
         r"https?://[^\s<>\"]+",
         text,
@@ -118,7 +119,6 @@ def parse_fastgpt_content(
         "。.,，；;)]}"
     )
 
-    # 尝试从普通文本中提取 PDF 文件名
     file_match = re.search(
         r"([^\r\n<>:\"/\\|?*]+\.pdf)",
         text,
@@ -138,10 +138,18 @@ def parse_fastgpt_content(
     }
 
 
-def call_fastgpt_export_workflow() -> dict[str, Any]:
+def call_fastgpt_export_workflow(
+    batch: str,
+) -> dict[str, Any]:
     """
-    调用 FastGPT 工作流，生成医师复验 PDF。
+    调用 FastGPT。
+
+    这里把批次编号作为“用户问题”传给 FastGPT。
+    例如当前是第4批，发送给 FastGPT 的内容就是：
+    4
     """
+    batch_id = normalize_batch_id(batch)
+
     api_base = get_required_env(
         "FASTGPT_API_BASE"
     ).rstrip("/")
@@ -168,7 +176,11 @@ def call_fastgpt_export_workflow() -> dict[str, Any]:
         "messages": [
             {
                 "role": "user",
-                "content": "导出医师复验 PDF",
+
+                # 关键修改：
+                # 不再发送固定文字，
+                # 直接发送当前批次编号
+                "content": batch_id,
             }
         ],
     }
@@ -193,9 +205,8 @@ def call_fastgpt_export_workflow() -> dict[str, Any]:
 
     except httpx.TimeoutException as exc:
         raise RuntimeError(
-            "调用 FastGPT 超时。请检查："
-            "FastGPT 工作流、cpolar 和 PDF 生成后端"
-            "是否都在运行。"
+            "调用 FastGPT 超时。请检查 FastGPT 工作流、"
+            "cpolar 和 PDF 生成后端是否都在运行。"
         ) from exc
 
     except httpx.HTTPStatusError as exc:
@@ -248,23 +259,22 @@ def call_fastgpt_export_workflow() -> dict[str, Any]:
 
     if not download_url:
         raise RuntimeError(
-            "FastGPT 工作流没有返回 "
-            "download_url"
+            "FastGPT 工作流没有返回 download_url"
         )
 
     file_name = str(
         parsed.get("file_name")
-        or "医师复验清单.pdf"
+        or f"第{batch_id}批医师复验清单.pdf"
     ).strip()
 
     return {
         "success": bool(
             parsed.get("success", True)
         ),
-        "message": str(
-            parsed.get("message")
-            or "医师复验 PDF 生成成功"
+        "message": (
+            f"第 {batch_id} 批医师复验 PDF 生成成功"
         ),
+        "batch": batch_id,
         "file_name": file_name,
         "download_url": download_url,
     }
@@ -272,16 +282,27 @@ def call_fastgpt_export_workflow() -> dict[str, Any]:
 
 @router.post(
     "/export-pdf-via-fastgpt",
-    summary="通过 FastGPT 生成医师复验 PDF",
+    summary="通过 FastGPT 生成当前批次医师复验 PDF",
 )
-def export_pdf_via_fastgpt() -> dict[str, Any]:
+def export_pdf_via_fastgpt(
+    batch: str = Query(
+        ...,
+        min_length=1,
+        max_length=64,
+        description="当前复验批次编号，例如 4",
+    ),
+) -> dict[str, Any]:
     """
-    提供给 Cme_MV 前端调用。
+    前端调用示例：
 
-    前端只调用本接口，不接触 FastGPT API Key。
+    POST /api/review/export-pdf-via-fastgpt?batch=4
     """
     try:
-        return call_fastgpt_export_workflow()
+        batch_id = normalize_batch_id(batch)
+
+        return call_fastgpt_export_workflow(
+            batch_id
+        )
 
     except RuntimeError as exc:
         raise HTTPException(
