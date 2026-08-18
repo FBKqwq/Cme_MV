@@ -27,7 +27,7 @@ LIGHT_GRAY = "F2F4F7"
 CALLOUT = "F4F6F9"
 CAUTION_FILL = "FFF8E8"
 CAUTION = "7A5A00"
-BORDER = "CCD5E1"
+BORDER = "1F4D78"
 WHITE = "FFFFFF"
 
 PAGE_WIDTH_DXA = 12240
@@ -167,7 +167,7 @@ def set_cell_margins(cell, top=80, start=120, bottom=80, end=120) -> None:
         node.set(qn("w:type"), "dxa")
 
 
-def set_table_borders(table, color=BORDER, size="4") -> None:
+def set_table_borders(table, color=BORDER, size="8") -> None:
     tbl_pr = table._tbl.tblPr
     borders = tbl_pr.find(qn("w:tblBorders"))
     if borders is None:
@@ -182,6 +182,24 @@ def set_table_borders(table, color=BORDER, size="4") -> None:
         tag.set(qn("w:sz"), size)
         tag.set(qn("w:space"), "0")
         tag.set(qn("w:color"), color)
+
+    # 给每个单元格也设置独立边框，防止 PDF 转换时内部框线丢失
+    for row in table.rows:
+        for cell in row.cells:
+            tc_pr = cell._tc.get_or_add_tcPr()
+            tc_borders = tc_pr.find(qn("w:tcBorders"))
+            if tc_borders is None:
+                tc_borders = OxmlElement("w:tcBorders")
+                tc_pr.append(tc_borders)
+            for edge in ("top", "left", "bottom", "right"):
+                tag = tc_borders.find(qn(f"w:{edge}"))
+                if tag is None:
+                    tag = OxmlElement(f"w:{edge}")
+                    tc_borders.append(tag)
+                tag.set(qn("w:val"), "single")
+                tag.set(qn("w:sz"), size)
+                tag.set(qn("w:space"), "0")
+                tag.set(qn("w:color"), color)
 
 
 def set_table_geometry(table, widths_dxa: list[int], indent_dxa=TABLE_INDENT_DXA) -> None:
@@ -410,7 +428,7 @@ def configure_page(doc: Document) -> None:
         line_spacing=1.0,
         alignment=WD_ALIGN_PARAGRAPH.LEFT,
     )
-    run = paragraph.add_run("CmePlatform  |  医师复核判定表")
+    run = paragraph.add_run("CmePlatform  |  医师复验清单")
     set_run_font(run, size=9, bold=True, color=MUTED)
 
     footer = section.footer
@@ -461,7 +479,7 @@ def add_title_block(doc: Document) -> None:
 def add_one_cell_callout(doc: Document, label: str, text: str, *, fill: str, label_color: str) -> None:
     table = doc.add_table(rows=1, cols=1)
     set_table_geometry(table, [CONTENT_WIDTH_DXA])
-    set_table_borders(table, color=BORDER, size="4")
+    set_table_borders(table)
     cell = table.cell(0, 0)
     set_cell_shading(cell, fill)
     paragraph = cell.paragraphs[0]
@@ -556,7 +574,7 @@ def add_decision_options(doc: Document, options: list[str]) -> None:
         cell.paragraphs[0].paragraph_format.space_before = Pt(2)
         cell.paragraphs[0].paragraph_format.space_after = Pt(2)
     set_table_geometry(table, [CONTENT_WIDTH_DXA])
-    set_table_borders(table, color=BORDER, size="4")
+    set_table_borders(table)
 
 
 def add_notes_box(doc: Document) -> None:
@@ -573,7 +591,7 @@ def add_notes_box(doc: Document) -> None:
         run = paragraph.add_run(label)
         set_run_font(run, size=10, bold=True, color=INK)
     set_table_geometry(table, [CONTENT_WIDTH_DXA])
-    set_table_borders(table, color=BORDER, size="4")
+    set_table_borders(table)
 
 
 def add_signature_table(doc: Document) -> None:

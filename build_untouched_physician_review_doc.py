@@ -15,17 +15,15 @@ from docx.oxml.ns import qn
 from docx.shared import Pt
 
 from build_physician_review_doc import (
+    BLUE,
     BORDER,
     CALLOUT,
-    CAUTION,
     CAUTION_FILL,
     CONTENT_WIDTH_DXA,
     DARK_BLUE,
     INK,
-    LIGHT_BLUE,
     LIGHT_GRAY,
     MUTED,
-    add_one_cell_callout,
     add_text_paragraph,
     configure_page,
     configure_styles,
@@ -82,6 +80,15 @@ def read_jsonl(path: Path):
             line = line.strip()
             if line:
                 yield json.loads(line)
+
+
+def wrap_title(title: str) -> str:
+    """给文献标题加上《》，如果标题本身还没有的话。"""
+    if not title:
+        return title
+    if "《" in title and "》" in title:
+        return title
+    return f"《{title}》"
 
 
 def sanitize_display(value: Any, *, limit: int | None = None) -> str:
@@ -450,76 +457,45 @@ def add_title_block(
         color=INK,
         after=4,
     )
-    add_text_paragraph(
-        doc,
-        "机器判定需复验且当前尚未形成人工结论的实体",
-        size=13.2,
-        color=MUTED,
-        after=15,
-    )
-    metadata = [
-        ("筛选口径", "机器实体状态 status=review，且当前 review_decision=pending；撤销人工通过或拒绝后重新计入"),
-        (
-            "数据范围",
-            f"当前复验批次中的全部{document_count}篇文献",
-        ),
-        ("待复验数量", f"{untouched_count}条"),
-        ("生成日期", GENERATED_DATE),
-    ]
-    for label, value in metadata:
-        paragraph = doc.add_paragraph()
-        set_paragraph(paragraph, before=0, after=3, line_spacing=1.18)
-        label_run = paragraph.add_run(f"{label}：")
-        set_run_font(label_run, size=10.3, bold=True, color=INK)
-        value_run = paragraph.add_run(value)
-        set_run_font(value_run, size=10.3, color="333333")
+    count_paragraph = doc.add_paragraph()
+    set_paragraph(count_paragraph, before=0, after=3, line_spacing=1.18)
+    label_run = count_paragraph.add_run("待复验数量：")
+    set_run_font(label_run, size=10, bold=True, color=INK)
+    value_run = count_paragraph.add_run(f"{untouched_count}条")
+    set_run_font(value_run, size=10, color="333333")
 
 
 def add_summary_table(doc: Document, summary_rows: list[dict[str, Any]]) -> None:
-    doc.add_paragraph("复验范围汇总", style="Heading 1")
-    table = doc.add_table(rows=1, cols=5)
-    widths = [650, 4110, 1500, 1500, 1600]
+    heading = doc.add_paragraph(style="Heading 1")
+    heading_run = heading.add_run("复验范围汇总")
+    set_run_font(heading_run, size=16, bold=True, color=BLUE)
+    table = doc.add_table(rows=1, cols=4)
+    widths = [3760, 1800, 1800, 2000]
     set_table_geometry(table, widths)
     set_table_borders(table)
-    headers = ["序号", "文献", "机器需复验", "已人工复验", "当前未复验"]
+    headers = ["文献", "机器需复验", "已人工操作", "本次未操作"]
     for index, header in enumerate(headers):
         cell = table.rows[0].cells[index]
-        set_cell_shading(cell, LIGHT_BLUE)
-        format_cell_text(cell, header, bold=True, color=INK, size=9.3)
-        if index != 1:
-            cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        set_cell_shading(cell, "BFBFBF")
+        format_cell_text(cell, header, bold=True, color=INK, size=9)
+        cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
     mark_repeat_header(table.rows[0])
 
     for index, item in enumerate(summary_rows, start=1):
         cells = table.add_row().cells
         values = [
-            str(index),
-            sanitize_display(item["title"], limit=90),
+            wrap_title(sanitize_display(item["title"], limit=90)),
             str(item["machine_review"]),
             str(item["human_operated"]),
             str(item["untouched"]),
         ]
         for cell_index, value in enumerate(values):
-            format_cell_text(cells[cell_index], value, size=9.1)
-            if cell_index != 1:
+            format_cell_text(cells[cell_index], value, size=9)
+            if cell_index != 0:
                 cells[cell_index].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
         if item["untouched"] > 0:
-            set_cell_shading(cells[4], CAUTION_FILL)
+            set_cell_shading(cells[3], CAUTION_FILL)
         set_row_cant_split(table.rows[-1])
-
-    add_text_paragraph(doc, "", size=2, after=2)
-    add_one_cell_callout(
-        doc,
-        "填写及边界说明",
-        (
-            "医师分别复验实体名称和实体类型，可接受当前结果、删除实体，"
-            "或填写修改后的实体名称与实体类型，并在修订说明中写明医学依据。"
-            "本清单仅用于知识库实体质量复验，不用于患者诊断、处方或治疗决策。"
-        ),
-        fill=CALLOUT,
-        label_color=DARK_BLUE,
-    )
-    set_row_cant_split(doc.tables[-1].rows[0])
 
 
 def _clear_cell(cell) -> None:
@@ -600,21 +576,21 @@ def add_entity_overview_table(doc: Document, row: dict[str, Any]) -> None:
     table = doc.add_table(rows=2, cols=4)
     widths = [1300, 3600, 1300, 3160]
     set_table_geometry(table, widths)
-    set_table_borders(table, color=BORDER, size="4")
+    set_table_borders(table)
 
     # 第一行：实体名称、实体类型
     labels = ((0, "实体名称"), (2, "实体类型"))
     for column, label in labels:
         cell = table.cell(0, column)
         set_cell_shading(cell, LIGHT_GRAY)
-        format_cell_text(cell, label, bold=True, color=INK, size=10.3)
+        format_cell_text(cell, label, bold=True, color=INK, size=10)
         cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
 
-    format_cell_text(table.cell(0, 1), row["name"], size=10.4)
+    format_cell_text(table.cell(0, 1), row["name"], size=10)
     format_cell_text(
         table.cell(0, 3),
         _type_name_only(row["entity_type"]),
-        size=10.4,
+        size=10,
     )
 
     # 第二行：指南上下文跨 3 列
@@ -624,11 +600,11 @@ def add_entity_overview_table(doc: Document, row: dict[str, Any]) -> None:
     p1 = label_cell.paragraphs[0]
     set_paragraph(p1, before=0, after=5, line_spacing=1.2)
     r1 = p1.add_run("指南")
-    set_run_font(r1, size=10.3, bold=True, color=INK)
+    set_run_font(r1, size=10, bold=True, color=INK)
     p2 = label_cell.add_paragraph()
     set_paragraph(p2, before=0, after=0, line_spacing=1.2)
     r2 = p2.add_run("上下文")
-    set_run_font(r2, size=10.3, bold=True, color=INK)
+    set_run_font(r2, size=10, bold=True, color=INK)
 
     context_cell = table.cell(1, 1).merge(table.cell(1, 3))
     set_cell_shading(context_cell, CALLOUT)
@@ -647,9 +623,9 @@ def _add_checkbox_line(cell, label: str, *, after: float = 6) -> None:
     paragraph = cell.add_paragraph() if cell.paragraphs[0].text else cell.paragraphs[0]
     set_paragraph(paragraph, before=0, after=after, line_spacing=1.2)
     label_run = paragraph.add_run(label)
-    set_run_font(label_run, size=10.2, bold=True, color=INK)
+    set_run_font(label_run, size=10, bold=True, color=INK)
     box_run = paragraph.add_run("  □")
-    set_run_font(box_run, size=11, color="222222")
+    set_run_font(box_run, size=10, color="222222")
 
 
 def add_entity_review_form(doc: Document, row: dict[str, Any]) -> None:
@@ -657,12 +633,12 @@ def add_entity_review_form(doc: Document, row: dict[str, Any]) -> None:
     table = doc.add_table(rows=3, cols=2)
     widths = [4680, 4680]
     set_table_geometry(table, widths)
-    set_table_borders(table, color=BORDER, size="4")
+    set_table_borders(table)
 
     # 名称复验：左侧显示机器名称，右侧显示复验操作。
     left_name = table.cell(0, 0)
     _clear_cell(left_name)
-    _add_cell_paragraph(left_name, "实体名称：", size=10.4, bold=True, color=INK, after=9)
+    _add_cell_paragraph(left_name, "实体名称：", size=10, bold=True, color=INK, after=9)
     _add_cell_paragraph(left_name, row["name"], size=10.5, after=2, line_spacing=1.35)
 
     right_name = table.cell(0, 1)
@@ -672,14 +648,14 @@ def add_entity_review_form(doc: Document, row: dict[str, Any]) -> None:
     paragraph = right_name.add_paragraph()
     set_paragraph(paragraph, before=0, after=4, line_spacing=1.2)
     label_run = paragraph.add_run("修改实体名称：")
-    set_run_font(label_run, size=10.2, bold=True, color=INK)
+    set_run_font(label_run, size=10, bold=True, color=INK)
     line_run = paragraph.add_run("____________________")
-    set_run_font(line_run, size=10.2, color="222222")
+    set_run_font(line_run, size=10, color="222222")
 
     # 类型复验：左侧显示机器类型，右侧显示可选类型。
     left_type = table.cell(1, 0)
     _clear_cell(left_type)
-    _add_cell_paragraph(left_type, "实体类型", size=10.4, bold=True, color=INK, after=11)
+    _add_cell_paragraph(left_type, "实体类型", size=10, bold=True, color=INK, after=11)
     _add_cell_paragraph(
         left_type,
         _type_name_only(row["entity_type"]),
@@ -690,7 +666,7 @@ def add_entity_review_form(doc: Document, row: dict[str, Any]) -> None:
     right_type = table.cell(1, 1)
     _clear_cell(right_type)
     _add_checkbox_line(right_type, "接受实体类型：", after=8)
-    _add_cell_paragraph(right_type, "修改实体类型：", size=10.2, bold=True, color=INK, after=6)
+    _add_cell_paragraph(right_type, "修改实体类型：", size=10, bold=True, color=INK, after=6)
 
     choices = [
         ("疾病名", "确诊名"),
@@ -702,19 +678,19 @@ def add_entity_review_form(doc: Document, row: dict[str, Any]) -> None:
         paragraph = right_type.add_paragraph()
         set_paragraph(paragraph, before=0, after=5, line_spacing=1.2)
         left_run = paragraph.add_run(f"{left_choice}  □")
-        set_run_font(left_run, size=10.1, color="222222")
+        set_run_font(left_run, size=10, color="222222")
         spacer = " " * max(6, 18 - len(left_choice) * 2)
         middle_run = paragraph.add_run(spacer)
-        set_run_font(middle_run, size=10.1, color="222222")
+        set_run_font(middle_run, size=10, color="222222")
         right_run = paragraph.add_run(f"{right_choice}  □")
-        set_run_font(right_run, size=10.1, color="222222")
+        set_run_font(right_run, size=10, color="222222")
 
     # 修订说明跨两列，并保留书写空间。
     notes_cell = table.cell(2, 0).merge(table.cell(2, 1))
     _clear_cell(notes_cell)
-    _add_cell_paragraph(notes_cell, "修订说明：", size=10.4, bold=True, color=INK, after=16)
+    _add_cell_paragraph(notes_cell, "修订说明：", size=10, bold=True, color=INK, after=16)
     for _ in range(3):
-        _add_cell_paragraph(notes_cell, "", size=10.2, after=12)
+        _add_cell_paragraph(notes_cell, "", size=10, after=12)
 
     for table_row in table.rows:
         set_row_cant_split(table_row)
@@ -727,42 +703,26 @@ def add_entity_card(
     *,
     document_title: str,
     document_entity_count: int,
-    document_stats: dict[str, Any] | None = None,
 ) -> None:
-    """一个实体一页，单实体版式严格按最初的医师复验示例组织。"""
     title = doc.add_paragraph(style="Heading 1")
-    title.paragraph_format.page_break_before = True
     title.paragraph_format.space_before = Pt(0)
     title.paragraph_format.space_after = Pt(12)
-    title_run = title.add_run(f"{document_title}（{document_entity_count}条）")
+    title_run = title.add_run(f"{wrap_title(document_title)}（{document_entity_count}条）")
     set_run_font(title_run, size=16, bold=True, color=INK)
-
-    if document_stats is not None:
-        add_text_paragraph(
-            doc,
-            (
-                f'机器判定需复验 {document_stats["machine_review"]} 条，'
-                f'已人工复验 {document_stats["human_operated"]} 条，'
-                f'当前未复验 {document_stats["untouched"]} 条。'
-            ),
-            size=9.3,
-            color=MUTED,
-            after=9,
-        )
 
     heading = doc.add_paragraph()
     set_paragraph(heading, before=0, after=11, line_spacing=1.25, keep_with_next=True)
     number_run = heading.add_run(f"实体 {number:02d} · ")
-    set_run_font(number_run, size=12.2, bold=True, color=INK)
-    name_run = heading.add_run(row["name"])
-    set_run_font(name_run, size=12.2, bold=False, color="222222")
+    set_run_font(number_run, size=12, bold=True, color=INK)
 
     add_entity_overview_table(doc, row)
     add_text_paragraph(doc, "", size=2, after=4)
     add_entity_review_form(doc, row)
 
 def add_section_signature(doc: Document, title: str, count: int) -> None:
-    doc.add_paragraph("文献复验签署", style="Heading 3")
+    sig_heading = doc.add_paragraph(style="Heading 3")
+    sig_heading_run = sig_heading.add_run("文献复验签署")
+    set_run_font(sig_heading_run, size=12, bold=True, color=DARK_BLUE)
     table = doc.add_table(rows=2, cols=4)
     widths = [1400, 3280, 1400, 3280]
     values = [
@@ -848,7 +808,6 @@ def build_document() -> Path:
                 number,
                 document_title=summary["title"],
                 document_entity_count=len(rows),
-                document_stats=summary if row_index == 0 else None,
             )
             number += 1
 

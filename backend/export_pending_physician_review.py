@@ -1,4 +1,4 @@
-"""Export untouched machine-review entities for one review batch.
+cd"""Export untouched machine-review entities for one review batch.
 
 Usage:
     python export_pending_physician_review.py 1
