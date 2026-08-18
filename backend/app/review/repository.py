@@ -24,6 +24,7 @@ from .config import (
     RESULT_ROOT,
     SCHEMA_PATH,
 )
+from .models import ENTITY_NAME_MAX_LENGTH
 
 
 def utc_now() -> str:
@@ -1772,6 +1773,30 @@ class ReviewRepository:
                 for field in editable_fields
                 if snapshot.get(field, "") != existing_values[field]
             }
+            if "name" in patch:
+                name = str(patch["name"]).strip()
+                if not name:
+                    raise HTTPException(
+                        status_code=422,
+                        detail={
+                            "code": "ENTITY_NAME_EMPTY",
+                            "message": "实体名称不能为空",
+                            "entity_id": entity_id,
+                        },
+                    )
+                if len(name) > ENTITY_NAME_MAX_LENGTH:
+                    raise HTTPException(
+                        status_code=422,
+                        detail={
+                            "code": "ENTITY_NAME_TOO_LONG",
+                            "message": (
+                                f"实体名称最多 {ENTITY_NAME_MAX_LENGTH} 个字符，"
+                                f"当前为 {len(name)} 个字符"
+                            ),
+                            "entity_id": entity_id,
+                        },
+                    )
+                patch["name"] = name
             if (
                 "entity_type" in patch
                 and entity_type not in self.entity_contract_labels

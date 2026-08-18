@@ -133,6 +133,40 @@ function selectBatch(event: Event) {
           <CheckCircle2 :size="12" />
           暂无阻塞
         </span>
+
+        <span
+            class="header-progress-divider"
+            aria-hidden="true"
+        ></span>
+
+        <div
+            class="save-indicator"
+            :class="saveState"
+            role="status"
+        >
+          <LoaderCircle
+              v-if="saveState === 'saving'"
+              :size="14"
+              class="spin"
+          />
+
+          <CheckCircle2
+              v-else-if="saveState === 'saved'"
+              :size="14"
+          />
+
+          <AlertCircle
+              v-else-if="saveState === 'error'"
+              :size="14"
+          />
+
+          <Circle
+              v-else
+              :size="10"
+          />
+
+          <span>{{ savingLabel }}</span>
+        </div>
       </div>
     </div>
 
@@ -160,35 +194,6 @@ function selectBatch(event: Event) {
           </option>
         </select>
       </label>
-
-      <div
-          class="save-indicator"
-          :class="saveState"
-          role="status"
-      >
-        <LoaderCircle
-            v-if="saveState === 'saving'"
-            :size="14"
-            class="spin"
-        />
-
-        <CheckCircle2
-            v-else-if="saveState === 'saved'"
-            :size="14"
-        />
-
-        <AlertCircle
-            v-else-if="saveState === 'error'"
-            :size="14"
-        />
-
-        <Circle
-            v-else
-            :size="10"
-        />
-
-        <span>{{ savingLabel }}</span>
-      </div>
 
       <details class="utility-menu">
         <summary
@@ -301,9 +306,10 @@ function selectBatch(event: Event) {
   z-index: 30;
   display: grid;
   grid-template-columns:
-    minmax(220px, 0.75fr)
-    minmax(280px, 1.35fr)
-    minmax(480px, 1fr);
+    minmax(220px, 0.72fr)
+    minmax(280px, 1fr)
+    max-content;
+  column-gap: 12px;
   align-items: center;
   height: var(--topbar-height);
   padding: 0 18px;
@@ -463,10 +469,22 @@ function selectBatch(event: Event) {
   color: var(--teal);
 }
 
+.header-progress-divider {
+  width: 1px;
+  height: 14px;
+  flex: 0 0 auto;
+  background: var(--border);
+}
+
 .topbar-actions {
-  min-width: 0;
+  flex: 0 0 auto;
   justify-content: flex-end;
   gap: 8px;
+  white-space: nowrap;
+}
+
+.topbar-actions > * {
+  flex: 0 0 auto;
 }
 
 .batch-picker {
@@ -624,6 +642,10 @@ function selectBatch(event: Event) {
   opacity: 0.66;
 }
 
+.finalize-button {
+  white-space: nowrap;
+}
+
 /*
  * 屏幕稍窄时仅显示导出图标，
  * 避免顶部操作区域被挤压。
@@ -633,7 +655,7 @@ function selectBatch(event: Event) {
     grid-template-columns:
       minmax(200px, 0.7fr)
       minmax(250px, 1fr)
-      minmax(390px, 0.9fr);
+      max-content;
   }
 
   .pending-export-button {
@@ -650,15 +672,17 @@ function selectBatch(event: Event) {
 @media (max-width: 1279px) {
   .topbar {
     grid-template-columns:
-      minmax(200px, 0.7fr)
-      minmax(240px, 1fr)
-      minmax(320px, 0.8fr);
+      minmax(180px, 0.7fr)
+      minmax(180px, 1fr)
+      max-content;
     padding: 0 13px;
   }
 
   .contract-badge,
   .header-progress-issues,
   .header-progress-clear,
+  .header-progress-divider,
+  .save-indicator span,
   .batch-picker > span,
   .utility-menu summary span {
     display: none;

@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
 
     frontend_origin: str = "http://localhost:5173"
+    # 供浏览器访问的导出服务地址。
+    review_export_public_base_url: str = ""
     runtime_data_root: Path = Path("data/runtime")
     review_data_root: Path = Path("data/review")
 

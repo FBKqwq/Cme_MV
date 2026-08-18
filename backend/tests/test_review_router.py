@@ -139,3 +139,64 @@ def test_batch_query_switches_repository(monkeypatch, tmp_path) -> None:
     assert second.version() == 1
     assert not list(first.delta_root.rglob("*.review.json"))
     assert list(second.delta_root.rglob("*.review.json"))
+
+
+def test_chunk_snapshot_round_trips_legacy_long_name_but_rejects_long_edit(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    from tests.test_review_repository import make_task
+
+    legacy_name = "旧" * 201
+    repository = make_task(tmp_path, second_entity_name=legacy_name)
+    monkeypatch.setattr(review_module, "_batch_ids", lambda root=None: ["1"])
+    monkeypatch.setattr(review_module, "repository", repository)
+    monkeypatch.setattr(review_module, "repository_batch", "1")
+    monkeypatch.setattr(review_module, "startup_error", None)
+
+    with make_client() as client:
+        detail = client.get("/api/review/chunks/TEST_CH01").json()
+        entities = [
+            {
+                "entity_id": entity["entity_id"],
+                "name": entity["name"],
+                "entity_type": entity["entity_type"],
+                "evidence_text": entity.get("evidence_text") or entity["name"],
+                "rejected": False,
+                "approved": entity["entity_id"] == "E01",
+            }
+            for entity in detail["entities"]
+        ]
+        round_trip = client.put(
+            "/api/review/chunks/TEST_CH01/entities",
+            json={"base_version": detail["version"], "entities": entities},
+        )
+
+        entities[1]["name"] = "新" * 201
+        long_edit = client.put(
+            "/api/review/chunks/TEST_CH01/entities",
+            json={
+                "base_version": round_trip.json()["version"],
+                "entities": entities,
+            },
+        )
+
+        entities[1]["name"] = "规范实体名称"
+        shortened = client.put(
+            "/api/review/chunks/TEST_CH01/entities",
+            json={
+                "base_version": round_trip.json()["version"],
+                "entities": entities,
+            },
+        )
+
+    assert round_trip.status_code == 200
+    assert round_trip.json()["changed"] == 1
+    assert long_edit.status_code == 422
+    assert long_edit.json()["detail"] == {
+        "code": "ENTITY_NAME_TOO_LONG",
+        "message": "实体名称最多 200 个字符，当前为 201 个字符",
+        "entity_id": "E02",
+    }
+    assert shortened.status_code == 200
+    assert shortened.json()["version"] == 2

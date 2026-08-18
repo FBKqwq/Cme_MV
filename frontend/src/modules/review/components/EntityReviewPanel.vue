@@ -40,6 +40,7 @@ const emit = defineEmits<{
 }>();
 
 const nameInput = ref<HTMLInputElement | null>(null);
+const ENTITY_NAME_MAX_LENGTH = 200;
 const rejectedEntities = computed(() =>
   props.pendingEntities.filter(
     (entity) =>
@@ -70,9 +71,15 @@ const decisionEntities = computed(() => [
 const editingEntity = computed(() =>
   props.detail.entities.find((entity) => entity.entity_id === props.editingId),
 );
-const canSubmit = computed(
-  () => Boolean(props.draft.name.trim() && props.draft.evidence_text.trim()),
-);
+const submitHint = computed(() => {
+  const name = props.draft.name.trim();
+  if (!name || !props.draft.evidence_text.trim()) return "名称和证据不能为空";
+  if (name.length > ENTITY_NAME_MAX_LENGTH) {
+    return `实体名称最多 ${ENTITY_NAME_MAX_LENGTH} 个字符，当前为 ${name.length} 个字符`;
+  }
+  return "";
+});
+const canSubmit = computed(() => !submitHint.value);
 const lanes = computed(() => [
   {
     key: "accepted",
@@ -175,6 +182,7 @@ function handleEditorKeydown(event: KeyboardEvent) {
             ref="nameInput"
             :value="draft.name"
             type="text"
+            :maxlength="ENTITY_NAME_MAX_LENGTH"
             @input="emit('updateDraft', { name: ($event.target as HTMLInputElement).value })"
           />
         </label>
@@ -217,7 +225,7 @@ function handleEditorKeydown(event: KeyboardEvent) {
       </div>
 
       <div class="editor-actions">
-        <span v-if="!canSubmit">名称和证据不能为空</span>
+        <span v-if="submitHint">{{ submitHint }}</span>
         <button class="button quiet compact" type="button" @click="emit('cancelEdit')">
           取消
         </button>
@@ -251,6 +259,7 @@ function handleEditorKeydown(event: KeyboardEvent) {
           <input
             :value="draft.name"
             type="text"
+            :maxlength="ENTITY_NAME_MAX_LENGTH"
             placeholder="输入实体名称"
             @input="emit('updateDraft', { name: ($event.target as HTMLInputElement).value })"
           />
@@ -283,6 +292,7 @@ function handleEditorKeydown(event: KeyboardEvent) {
         </label>
       </div>
       <div class="editor-actions">
+        <span v-if="submitHint">{{ submitHint }}</span>
         <button class="button quiet compact" type="button" @click="emit('cancelCreate')">
           取消
         </button>

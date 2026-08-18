@@ -24,6 +24,7 @@ def make_task(
     with_pdf: bool = False,
     with_label_result: bool = False,
     with_second_document: bool = False,
+    second_entity_name: str = "口腔溃疡",
 ) -> ReviewRepository:
     review_root = tmp_path / "data" / "review"
     inbox = review_root / "current"
@@ -75,7 +76,7 @@ def make_task(
             "entity_id": "E02",
             "chunk_id": "CH01",
             "entity_type": "symptoms",
-            "name": "口腔溃疡",
+            "name": second_entity_name,
             "evidence_text": "反复口腔溃疡",
         },
     ]

@@ -37,6 +37,7 @@ describe("ReviewHeader", () => {
         batchSwitching: false,
         saveState: "idle",
         savingLabel: "修改自动保存",
+        exportingPendingPdf: false,
       },
     });
 
@@ -46,6 +47,8 @@ describe("ReviewHeader", () => {
     expect(wrapper.get(".header-progress-value").attributes("style")).toContain(
       "width: 15%",
     );
+    expect(wrapper.get(".topbar-actions").text()).toContain("导出未复验实体");
+    expect(wrapper.get(".topbar-actions").text()).toContain("完成本篇复验");
   });
 
   it("emits the selected review batch", async () => {
@@ -60,6 +63,7 @@ describe("ReviewHeader", () => {
         batchSwitching: false,
         saveState: "idle",
         savingLabel: "修改自动保存",
+        exportingPendingPdf: false,
       },
     });
 

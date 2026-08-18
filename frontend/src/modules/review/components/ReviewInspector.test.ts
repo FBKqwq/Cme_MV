@@ -67,6 +67,7 @@ function createWrapper(options?: {
   selectedEvidence?: string;
   acceptedEntities?: EntityRecord[];
   pendingEntities?: EntityRecord[];
+  draft?: EntityDraft;
 }) {
   return mount(EntityReviewPanel, {
     props: {
@@ -76,7 +77,7 @@ function createWrapper(options?: {
       selectedEntityId: "",
       editingId: options?.editingId ?? "",
       showAdd: options?.showAdd ?? false,
-      draft,
+      draft: options?.draft ?? draft,
       selectedEvidence: options?.selectedEvidence ?? "",
       entityTypeColors: { diseases: "#fee2e2" },
       entityTypeLabel: (value: string) => value ? "疾病" : "类型待定",
@@ -211,6 +212,24 @@ describe("EntityReviewPanel", () => {
 
     expect(wrapper.text()).toContain("仅修改当前 Chunk 中的这次提及");
     expect(wrapper.text()).not.toContain("全部同源提及");
+  });
+
+  it("blocks an edited entity name longer than 200 characters", async () => {
+    const wrapper = createWrapper({
+      editingId: pending.entity_id,
+      draft: { ...draft, name: "超".repeat(201) },
+    });
+    const saveButton = wrapper.get(".entity-editor .button.primary");
+
+    expect(wrapper.get('input[type="text"]').attributes("maxlength")).toBe("200");
+    expect(wrapper.text()).toContain("实体名称最多 200 个字符，当前为 201 个字符");
+    expect(saveButton.attributes()).toHaveProperty("disabled");
+
+    await wrapper.get(".entity-editor").trigger("keydown", {
+      key: "Enter",
+      ctrlKey: true,
+    });
+    expect(wrapper.emitted("save")).toBeUndefined();
   });
 
   it("shows the full colored entity type only once", () => {

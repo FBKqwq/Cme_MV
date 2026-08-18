@@ -984,12 +984,10 @@ async function exportPendingReviewPdf() {
   try {
     showToast(`正在生成第 ${activeBatch.value} 批未复验实体 PDF，请稍候`);
 
-    // reviewApi 会自动追加：
-    // ?batch=当前批次
     const result = await reviewApi<ReviewPdfExportResult>(
-        "/api/review/export-pdf-via-fastgpt",
+        "/api/export-review-pdf",
         {
-          method: "POST",
+          method: "GET",
           headers: {
             Accept: "application/json",
           },
