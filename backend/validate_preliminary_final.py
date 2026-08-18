@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
-"""Independently validate the six-batch preliminary entity artifact."""
+"""Independently validate a preliminary entity artifact.
+
+The artifact path is always supplied by the caller. Dataset-specific document
+counts are optional acceptance gates instead of hidden local defaults.
+"""
 
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
+import sys
 from collections import Counter
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Iterator, Sequence
 
 
-DEFAULT_ARTIFACT = Path(
-    r"C:\Users\zhurunjie\Desktop\CmePlatform\pro\data\final.staging_019fe955"
-)
 ALLOWED_CONTRACTS = {
     "semantic_role_contract_v6",
     "semantic_role_contract_v6_1",
@@ -49,7 +51,30 @@ def require(condition: bool, message: str) -> None:
         raise AssertionError(message)
 
 
-def validate(root: Path) -> dict[str, Any]:
+def non_negative_int(value: str) -> int:
+    parsed = int(value)
+    if parsed < 0:
+        raise argparse.ArgumentTypeError("必须是非负整数")
+    return parsed
+
+
+def require_expected_count(
+    actual: int,
+    expected: int | None,
+    label: str,
+) -> None:
+    if expected is not None:
+        require(actual == expected, f"expected {expected} {label}, got {actual}")
+
+
+def validate(
+    root: Path,
+    *,
+    expected_documents: int | None = None,
+    expected_excluded_documents: int | None = None,
+) -> dict[str, Any]:
+    root = root.resolve()
+    require(root.is_dir(), f"artifact directory does not exist: {root}")
     manifest_path = root / "manifests" / "preliminary_final.manifest.json"
     manifest = load_json(manifest_path)
     inventory = load_json(root / "manifests" / "document_inventory.json")
@@ -65,8 +90,16 @@ def validate(root: Path) -> dict[str, Any]:
         len(excluded_documents) == manifest["counts"]["excluded_documents"],
         "excluded document count",
     )
-    require(len(inventory) == 74, "expected 74 included documents")
-    require(len(excluded_documents) == 2, "expected 2 excluded documents")
+    require_expected_count(
+        len(inventory),
+        expected_documents,
+        "included documents",
+    )
+    require_expected_count(
+        len(excluded_documents),
+        expected_excluded_documents,
+        "excluded documents",
+    )
 
     actual_files = {
         str(path.relative_to(root)).replace("\\", "/"): path
@@ -230,12 +263,42 @@ def validate(root: Path) -> dict[str, Any]:
     }
 
 
-def main() -> None:
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("artifact", nargs="?", type=Path, default=DEFAULT_ARTIFACT)
-    arguments = parser.parse_args()
-    print(json.dumps(validate(arguments.artifact.resolve()), ensure_ascii=False, indent=2))
+    parser.add_argument(
+        "artifact",
+        type=Path,
+        help="待校验的 preliminary artifact 目录",
+    )
+    parser.add_argument(
+        "--expected-documents",
+        type=non_negative_int,
+        help="可选门禁：预期纳入的文献数量",
+    )
+    parser.add_argument(
+        "--expected-excluded-documents",
+        type=non_negative_int,
+        help="可选门禁：预期排除的文献数量",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    arguments = parse_args(argv)
+    try:
+        result = validate(
+            arguments.artifact,
+            expected_documents=arguments.expected_documents,
+            expected_excluded_documents=(
+                arguments.expected_excluded_documents
+            ),
+        )
+    except (AssertionError, KeyError, OSError, TypeError, ValueError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
