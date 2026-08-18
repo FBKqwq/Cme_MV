@@ -47,7 +47,7 @@ OUTPUT_PATH = (
     REVIEW_ROOT
     / "state"
     / "exports"
-    / f"医师复验清单_机器待复验且人工未操作_{GENERATED_DATE}.docx"
+    / f"医师复验清单_机器待复验且人工未操作_上下文扩展_{GENERATED_DATE}.docx"
 )
 
 # 不再排除任何文档。当前批次中的全部文献都参与未操作实体筛选。
@@ -56,6 +56,15 @@ EXCLUDED_DOCUMENT_ID: str | None = None
 # 正式 API 中待复验数量会变化，因此不再固定为 32。
 # 如需临时校验固定数量，可将 None 改成具体数字。
 EXPECTED_UNTOUCHED: int | None = None
+
+# 医师复验上下文长度控制：
+# - 硬性至少 200 个非空白字符；
+# - 默认尽量提供 300~600 字左右的上下文；
+# - 必要时自动拼接同一文献相邻 chunk，而不是只看当前 chunk。
+CONTEXT_HARD_MIN = 200
+CONTEXT_TARGET_MIN = 300
+CONTEXT_TARGET_MAX = 600
+CONTEXT_NEIGHBOR_RADIUS = 4
 
 TYPE_LABELS = {
     "diseases": "疾病",
@@ -104,8 +113,8 @@ def sanitize_display(value: Any, *, limit: int | None = None) -> str:
             pieces.append(char)
     text = "".join(pieces)
     text = re.sub(r"\s+", " ", text).strip()
-    if limit is not None and len(text) > limit:
-        text = text[: max(0, limit - 1)].rstrip() + "…"
+    # 不再在 sanitize_display 中按 limit 硬截断，避免半句乱码。
+    # 截断由 _clip_at_sentence_boundary 在句末处理。
     return text
 
 
@@ -124,10 +133,23 @@ def load_chunks() -> tuple[
     dict[str, dict[str, Any]],
     dict[tuple[str, str], dict[str, Any]],
     list[str],
+    dict[str, list[dict[str, Any]]],
 ]:
+    """
+    读取当前批次的 chunk。
+
+    除原来的 documents / chunks / document_order 外，
+    额外返回 chunk_sequences：
+        doc_id -> 按原文顺序排列的 chunk 列表
+
+    这样生成复验 context 时，如果当前 chunk 太短，可以可靠地向同一篇
+    文献的前后 chunk 扩展，而不需要再从导出的 PDF 反向 OCR。
+    """
     documents: dict[str, dict[str, Any]] = {}
     chunks: dict[tuple[str, str], dict[str, Any]] = {}
     document_order: list[str] = []
+    chunk_sequences: dict[str, list[dict[str, Any]]] = {}
+
     for path in sorted((REVIEW_ROOT / "current" / "chunks").glob("*chunk.json")):
         payload = read_json(path)
         doc_id = str(payload["doc_id"])
@@ -137,11 +159,17 @@ def load_chunks() -> tuple[
             "chunk_count": len(payload.get("chunks", [])),
         }
         document_order.append(doc_id)
+
+        ordered_chunks: list[dict[str, Any]] = []
         for index, chunk in enumerate(payload.get("chunks", []), start=1):
             item = dict(chunk)
             item["_index"] = index
             chunks[(doc_id, str(chunk["chunk_id"]))] = item
-    return documents, chunks, document_order
+            ordered_chunks.append(item)
+
+        chunk_sequences[doc_id] = ordered_chunks
+
+    return documents, chunks, document_order, chunk_sequences
 
 
 def load_reviewed_entity_ids() -> set[str]:
@@ -212,46 +240,246 @@ def load_source_entities() -> list[dict[str, Any]]:
     return rows
 
 
-def excerpt_around(entity: dict[str, Any], chunk: dict[str, Any] | None) -> str:
+def _visible_text_len(text: str) -> int:
+    """上下文长度按“非空白字符”计算。"""
+    return len(re.sub(r"\s+", "", text or ""))
+
+
+def _sentence_spans(text: str) -> list[tuple[int, int]]:
+    """
+    将原文切成语义片段。
+    不再像旧版那样“实体后遇到第一个句号就立刻截断”，
+    而是允许保留前后多句。
+    """
+    spans: list[tuple[int, int]] = []
+    start = 0
+
+    # 分号也可以作为医学指南中的弱边界；连续换行视作段落边界。
+    pattern = re.compile(r"[。！？!?；;]|\n\s*\n")
+
+    for match in pattern.finditer(text):
+        end = match.end()
+        if text[start:end].strip():
+            spans.append((start, end))
+        start = end
+
+    if start < len(text) and text[start:].strip():
+        spans.append((start, len(text)))
+
+    return spans
+
+
+def _clip_at_sentence_boundary(text: str, max_len: int, *, min_sentences: int = 2) -> str:
+    """
+    将文本截断到不超过 max_len 个非空白字符，且在句末截断（而非句中）。
+    保证至少保留 min_sentences 个完整句子。
+    """
+    stripped = text.strip()
+    if _visible_text_len(stripped) <= max_len:
+        return stripped
+
+    spans = _sentence_spans(stripped)
+    if len(spans) <= min_sentences:
+        return stripped
+
+    # 从后往前删句子，直到不超过 max_len，但至少保留 min_sentences 句
+    kept = spans[:]
+    while len(kept) > min_sentences and _visible_text_len(
+        stripped[kept[0][0]:kept[-1][1]]
+    ) > max_len:
+        # 判断删头还是删尾，哪个能让总量更接近 max_len 且实体仍在中间
+        head_len = kept[1][1] - kept[0][0]
+        tail_len = kept[-1][1] - kept[-2][0]
+        if head_len >= tail_len:
+            kept.pop(0)
+        else:
+            kept.pop()
+
+    result = stripped[kept[0][0]:kept[-1][1]].strip()
+    return result
+
+
+def _expand_semantic_window(
+    text: str,
+    *,
+    mention_start: int,
+    mention_end: int,
+) -> str:
+    """
+    围绕实体所在位置扩展上下文，保证至少 2 句完整句子。
+    1. 找到实体所在句；
+    2. 至少再取前 1 句 + 后 1 句（共 3 句，不足时取 2 句）；
+    3. 若仍不足 CONTEXT_TARGET_MIN，继续向两侧按句扩展；
+    4. 不超过 CONTEXT_TARGET_MAX 时直接返回；
+    5. 超过时在句末截断，保证不出现半句。
+    """
+    spans = _sentence_spans(text)
+
+    if not spans:
+        # 没有标点没法按句切，退而求其次取字符窗口
+        left = max(0, mention_start - 200)
+        right = min(len(text), mention_end + 400)
+        return sanitize_display(text[left:right])
+
+    # 找实体所在的句
+    center = 0
+    for i, (start, end) in enumerate(spans):
+        if start <= mention_start < end or mention_start <= start < mention_end:
+            center = i
+            break
+
+    # 初始窗口：前 1 句 + 实体句 + 后 1 句 = 至少 3 句（边界处至少 2 句）
+    left = max(0, center - 1)
+    right = min(len(spans) - 1, center + 1)
+
+    def current() -> str:
+        return sanitize_display(
+            text[spans[left][0]:spans[right][1]]
+        )
+
+    context = current()
+
+    # 不足目标长度时，继续按句向两侧扩展
+    take_left = True
+    while (
+        _visible_text_len(context) < CONTEXT_TARGET_MIN
+        and (left > 0 or right + 1 < len(spans))
+    ):
+        if take_left and left > 0:
+            left -= 1
+        elif (not take_left) and right + 1 < len(spans):
+            right += 1
+        elif left > 0:
+            left -= 1
+        elif right + 1 < len(spans):
+            right += 1
+
+        take_left = not take_left
+        context = current()
+
+    # 如果按句扩展仍不够硬性最低，说明源文献本身极短，直接给全部
+    if _visible_text_len(context) < CONTEXT_HARD_MIN:
+        full = sanitize_display(text)
+        if _visible_text_len(full) > _visible_text_len(context):
+            context = full
+
+    # 太长时在句末截断，保证至少 2 句
+    if _visible_text_len(context) > CONTEXT_TARGET_MAX:
+        context = _clip_at_sentence_boundary(
+            context, CONTEXT_TARGET_MAX, min_sentences=2
+        )
+
+    return context
+
+
+def excerpt_around(
+    entity: dict[str, Any],
+    chunk: dict[str, Any] | None,
+    document_chunks: list[dict[str, Any]] | None = None,
+) -> str:
+    """
+    从实体实际绑定的 chunk 生成医生复验 context。
+
+    关键点：
+    - 不再从“导出后的 PDF”反向识别实体；
+    - entity 本身已经带 document_id + chunk_id，所以这里直接使用准确来源；
+    - 当前 chunk 太短时，自动拼接同一文献前后 chunk；
+    - context 至少 100 字（只要源文献附近有足够文本）。
+
+    旧实现的主要问题是：
+        找到实体后，实体后面遇到“第一个句号/分号”就立刻结束，
+    所以很多 context 只有一小句。
+    """
     if not chunk:
-        return sanitize_display(entity.get("evidence_text"), limit=360)
-    raw_text = str(chunk.get("text") or "")
+        fallback = sanitize_display(entity.get("evidence_text"))
+        return fallback
+
+    current_text = str(chunk.get("text") or "")
+
+    # 先在“当前实体绑定的 chunk”里找实体，确保不会因为同名词在全文多次出现而错位。
     needles = [
         str(entity.get("raw_surface") or ""),
         str(entity.get("name") or ""),
         str(entity.get("semantic_name") or ""),
     ]
-    index = -1
+
+    local_index = -1
     needle = ""
+
     for candidate in needles:
+        candidate = candidate.strip()
         if not candidate:
             continue
-        index = raw_text.find(candidate)
-        if index >= 0:
+        local_index = current_text.find(candidate)
+        if local_index >= 0:
             needle = candidate
             break
-    if index < 0:
-        evidence = str(entity.get("evidence_text") or "")
-        candidate = evidence[: min(24, len(evidence))]
-        if candidate:
-            index = raw_text.find(candidate)
-            needle = candidate
-    if index < 0:
-        return sanitize_display(entity.get("evidence_text") or raw_text, limit=360)
 
-    start = max(0, index - 130)
-    end = min(len(raw_text), index + max(len(needle), 1) + 230)
-    before = raw_text[start:index]
-    after = raw_text[index:end]
-    punctuation = "。！？；\n"
-    last_break = max((before.rfind(mark) for mark in punctuation), default=-1)
-    if last_break >= 0:
-        start += last_break + 1
-    first_candidates = [after.find(mark, max(len(needle), 1)) for mark in punctuation]
-    first_candidates = [value for value in first_candidates if value >= 0]
-    if first_candidates:
-        end = min(end, index + min(first_candidates) + 1)
-    return sanitize_display(raw_text[start:end], limit=420)
+    # 若实体名因为清洗/标准化变化而找不到，使用 evidence 前缀定位。
+    if local_index < 0:
+        evidence = str(entity.get("evidence_text") or "")
+        for prefix_len in (40, 30, 24, 16, 12):
+            candidate = evidence[: min(prefix_len, len(evidence))].strip()
+            if not candidate:
+                continue
+            local_index = current_text.find(candidate)
+            if local_index >= 0:
+                needle = candidate
+                break
+
+    # 准备“当前 chunk + 相邻 chunk”窗口。
+    joined_text = current_text
+    mention_start = local_index if local_index >= 0 else 0
+
+    if document_chunks:
+        current_order = int(chunk.get("_index", 1) or 1) - 1
+        left_idx = max(0, current_order - CONTEXT_NEIGHBOR_RADIUS)
+        right_idx = min(
+            len(document_chunks),
+            current_order + CONTEXT_NEIGHBOR_RADIUS + 1,
+        )
+
+        selected = document_chunks[left_idx:right_idx]
+        pieces: list[str] = []
+        current_prefix_len = 0
+
+        for absolute_idx, item in enumerate(selected, start=left_idx):
+            piece = str(item.get("text") or "")
+            if absolute_idx == current_order:
+                current_prefix_len = sum(len(x) + 2 for x in pieces)
+            pieces.append(piece)
+
+        joined_text = "\n\n".join(pieces)
+
+        if local_index >= 0:
+            mention_start = current_prefix_len + local_index
+        else:
+            # 实体没精确命中时，以当前 chunk 中央为保守中心。
+            mention_start = current_prefix_len + max(0, len(current_text) // 2)
+
+    mention_end = mention_start + max(len(needle), 1)
+
+    context = _expand_semantic_window(
+        joined_text,
+        mention_start=mention_start,
+        mention_end=mention_end,
+    )
+
+    # 最后一道硬校验：如果仍不足规定字数，就扩大到相邻 chunk 窗口的最大允许长度。
+    if _visible_text_len(context) < CONTEXT_HARD_MIN:
+        larger = _clip_at_sentence_boundary(
+            joined_text, CONTEXT_TARGET_MAX, min_sentences=2
+        )
+        if _visible_text_len(larger) > _visible_text_len(context):
+            context = larger
+
+    # 确保最终上下文不超过目标上限，且在句末截断（至少 2 句）
+    if _visible_text_len(context) > CONTEXT_TARGET_MAX:
+        context = _clip_at_sentence_boundary(
+            context, CONTEXT_TARGET_MAX, min_sentences=2
+        )
+
+    return context
 
 
 def type_display(code: Any) -> str:
@@ -277,7 +505,7 @@ def build_review_rows() -> tuple[
     list[dict[str, Any]],
     dict[str, dict[str, Any]],
 ]:
-    documents, chunks, document_order = load_chunks()
+    documents, chunks, document_order, chunk_sequences = load_chunks()
     reviewed = load_reviewed_entity_ids()
     source_entities = load_source_entities()
 
@@ -371,7 +599,11 @@ def build_review_rows() -> tuple[
                     limit=420,
                 )
                 or "源记录未提供证据短句",
-                "context": excerpt_around(entity, chunk),
+                "context": excerpt_around(
+                    entity,
+                    chunk,
+                    chunk_sequences.get(doc_id, []),
+                ),
                 "confidence": confidence_display(entity),
             }
         )
@@ -384,6 +616,26 @@ def build_review_rows() -> tuple[
             row["entity_id"],
         )
     )
+
+    # 导出前硬校验：复验上下文不得少于硬性最少字数。
+    # 若真的存在极短源文本，直接明确报错，而不是生成一份上下文过短的PDF。
+    too_short = [
+        row
+        for row in untouched_rows
+        if _visible_text_len(row.get("context", "")) < CONTEXT_HARD_MIN
+    ]
+    if too_short:
+        preview = "\n".join(
+            f"- {row['document_title']} | {row['name']} | "
+            f"context={_visible_text_len(row.get('context', ''))}字 | "
+            f"chunk={row['chunk_id']}"
+            for row in too_short[:20]
+        )
+        raise RuntimeError(
+            "存在复验上下文不足 "
+            f"{CONTEXT_HARD_MIN} 字的实体，共 {len(too_short)} 条。\n"
+            f"{preview}"
+        )
     summary_rows = [
         stats[doc_id]
         for doc_id in document_order
